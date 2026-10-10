@@ -5,6 +5,7 @@
 - `index.html` —— 入口页（三个入口）
 - `steak.html` —— 完整手绘版指南（**中英双语**，14 节，单文件离线、无 CDN；右上角「EN / 中文」整篇切换语言）
 - `card.png` —— 一页速查卡（A4 可打印）
-- `full.png` —— 全篇长图（手机阅读）
+- `full.png` —— 全篇长图·中文（手机阅读）
+- `full_en.png` —— 全篇长图·English（same layout, English edition）
 
 内容依据原始资料整理，数据未作改写；指南用于培训与内部参考，食品安全底线以当地法规为准。
