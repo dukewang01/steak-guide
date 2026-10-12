@@ -122,10 +122,37 @@
   #share{width:100%;max-width:700px;height:74px;border-radius:12px;border:1px solid rgba(255,255,255,.16);padding:9px;
     font-family:inherit;font-size:12.5px;color:#e8dcc8;resize:none;background:rgba(255,255,255,.05);text-align:left}
   .row{display:flex;gap:9px;flex-wrap:wrap;justify-content:center}
-  #endRoles{display:flex;gap:7px;flex-wrap:wrap;justify-content:center}
-  #endRoles span{font-size:12px;color:#b7a89b;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.13);
-    border-radius:999px;padding:4px 10px;cursor:pointer}
-  #endRoles span:hover{color:#fff;border-color:rgba(255,255,255,.32)}
+  #endRoles{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;max-width:660px}
+  #endRoles .ecard{display:flex;flex-direction:column;align-items:center;gap:1px;min-width:134px;
+    background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.14);border-radius:14px;
+    padding:10px 12px 9px;cursor:pointer;box-shadow:none;transition:transform .12s,background .12s,border-color .12s}
+  #endRoles .ecard:hover{transform:translateY(-2px);background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.32)}
+  #endRoles .ecard i{font-style:normal;font-size:20px;line-height:1.15}
+  #endRoles .ecard b{font-size:13.5px;color:#fff;font-weight:800}
+  #endRoles .ecard s{text-decoration:none;font-size:11px;color:#a99a8d}
+  #endRoles .ecard.me{border-color:var(--ac,#f0801f);background:rgba(240,128,31,.12)}
+  #pauseBtn{cursor:pointer;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.10);color:#fff;
+    border-radius:8px;padding:2px 8px;font-size:13px;line-height:1.4}
+  #pauseBtn:hover{background:rgba(255,255,255,.2)}
+  #pTitle{font-size:30px;font-weight:900;color:#fff}
+  /* 返回上一级：开局 3 秒反悔窗（左下角，3 秒后自己淡出） */
+  #undo{position:fixed;left:16px;bottom:calc(var(--padh,86px) + 16px);z-index:60;cursor:pointer;
+    background:rgba(28,23,20,.88);border:1px solid rgba(255,255,255,.24);color:#f3ece5;border-radius:999px;
+    padding:9px 16px;font-size:13px;font-weight:800;backdrop-filter:blur(4px);animation:undoIn .22s ease}
+  #undo.hidden{display:none}
+  @keyframes undoIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  /* 窄屏：顶部按钮区会压标题 → 让开；三张角色卡排成一行不折行 */
+  @media (max-width:470px){
+    .panel > .in{padding:58px 14px 20px}
+    .panel h1{font-size:25px}
+    #endTitle{font-size:25px}
+    #endRoles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%}
+    #endRoles .ecard{min-width:0;padding:9px 5px 8px}
+    #endRoles .ecard i{font-size:17px}
+    #endRoles .ecard b{font-size:12.5px}
+    #endRoles .ecard s{font-size:10px}
+    #undo{left:12px;padding:8px 14px;font-size:12.5px}
+  }
 
   /* ---------- 底部悬浮操作条 ---------- */
   #pad{position:fixed;left:0;right:0;bottom:0;z-index:70;display:flex;gap:9px;justify-content:center;
@@ -169,7 +196,7 @@
           <span class="zone dry" id="z2c" style="left:100%;width:0;display:none"></span>
           <span class="mark" id="m2mkA" style="left:60%"></span></div>
       </div>
-      <div id="right"><span id="clock">60</span><span class="tsec">s</span><span id="combo"></span><span id="mute" title="静音 / M">🔊</span><span id="fs" title="全屏 / F">⛶</span></div>
+      <div id="right"><span id="clock">60</span><span class="tsec">s</span><span id="combo"></span><span id="mute" title="静音 / M">🔊</span><span id="fs" title="全屏 / F">⛶</span><span id="pauseBtn" title="暂停 / Esc">⏸</span></div>
     </div>
 
     <div id="toasts"></div>
@@ -227,20 +254,39 @@
         <div id="cf">—</div>
         <textarea id="share" readonly></textarea>
         <div class="row">
-          <button id="againBtn">再来一局（同角色）</button>
+          <button id="nextBtn">▶ 下一位 · 换个角色</button>
+          <button class="ghost" id="againBtn">同角色再来一局</button>
           <button class="ghost" id="saveBtn">保存成绩卡（图片）</button>
           <button class="ghost" id="copyBtn">复制成绩文案</button>
         </div>
+        <div class="hint" id="pickLbl">换个人来 —— 同一块肉，三个位置：</div>
         <div id="endRoles"></div>
+        <div class="row" style="margin-top:4px">
+          <button class="ghost" id="backBtn">↩ 回到选角页（重看三条机制）</button>
+        </div>
         <div class="hint" id="bestLine">最高分：<b id="best1">—</b></div>
         <div class="hint">点「保存成绩卡」发到群里 —— 三个人三张卡，看谁先当上「焦壳是一条线的钟表匠」</div>
         <div class="rules"><a class="rline" href="../" style="text-decoration:none"><b>📖 想认真学？看完整《牛排熟度指南》</b>这局里用到的八档熟度／触感／煎制时间／配酒，指南里有 14 节</a></div>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="pause">
+      <div class="in">
+        <div id="pTitle">⏸ 暂停</div>
+        <div class="hint">计时停下了，肉也停下了。这局可以接着打完，也可以换个人。</div>
+        <div class="row">
+          <button id="pResume">▶ 继续这局</button>
+          <button class="ghost" id="pRestart">↻ 重开本局</button>
+          <button class="ghost" id="pBack">↩ 回到选角页</button>
+        </div>
       </div>
     </div>
   </div>
 
   <div id="rot">↻ 横屏更宽敞（竖屏也能玩）</div>
 </div>
+
+<button id="undo" class="hidden" title="点错了角色？3 秒内可以退">↩ 换角色</button>
 
 <div id="pad">
   <div data-act="left">◀</div><div data-act="main" id="padMain">出锅</div><div data-act="right">▶</div>
@@ -520,6 +566,8 @@ function reset(){
   toastBox.innerHTML = ""; lastToast = {};
   applyHud(R);
   hudRender();
+  navPush();        /* 返回键：这一局算一层 */
+  undoShow();       /* 3 秒反悔窗 */
 }
 function setHud(on){ document.body.classList.toggle("nohud", !on); }
 function setRole(id, noStart){
@@ -530,8 +578,74 @@ function setRole(id, noStart){
   document.getElementById("start").querySelector("h1 small").textContent = "60 秒 · 换个身份看这块肉";
   if(!noStart) reset();
 }
+
+/* ================= 上一级：选角页 / 换角色 / 返回键 / 反悔窗 / 暂停 =================
+   设计：这款游戏里「返回上一级」= 换手（一台手机三个人轮流玩），
+   所以它只出现在两处 —— 结算页（主按钮）和开局 3 秒（反悔窗），不做进行中的常驻返回按钮。 */
+var NFX = ["chef", "foh", "guest"];
+function showStart(){                     /* 回到选角页：当前局作废，不结算 */
+  undoHide(); pauseHide(true);
+  if(S) S.ended = true;
+  running = false;
+  setHud(false);
+  document.getElementById("end").classList.add("hidden");
+  document.getElementById("pause").classList.add("hidden");
+  document.getElementById("start").classList.remove("hidden");
+  syncPad();
+}
+function nextRoleId(){ var i = NFX.indexOf(R ? R.id : "chef"); return NFX[(i + 1) % NFX.length]; }
+function pickNext(){ undoHide(); setRole(nextRoleId()); musicStart(); sfx("click"); }
+function backToPick(){ navDrop(); showStart(); }
+
+/* 浏览器返回键映射：进角色时压一层，返回 → 回选角页；再按一次才真的离开页面 */
+var navOn = false, navGuard = 0;
+function navPush(){
+  if(BOT) return;
+  try{ if(!navOn){ history.pushState({ stk: "play" }, ""); navOn = true; } }catch(e){}
+}
+function navDrop(){
+  if(BOT || !navOn) return;
+  navOn = false; navGuard = 1;
+  try{ history.back(); }catch(e){ if(navGuard) navGuard = 0; }
+}
+window.addEventListener("popstate", function(){
+  if(navGuard){ navGuard = 0; return; }        /* 这一层是我们自己退的 */
+  if(!navOn) return;                            /* 已经在选角页：这次返回才是真离开 */
+  navOn = false;
+  showStart();
+});
+
+/* 开局 3 秒反悔窗：点错角色能退 */
+var undoEl = document.getElementById("undo"), undoTimer = 0;
+function undoHide(){
+  if(undoTimer){ clearTimeout(undoTimer); undoTimer = 0; }
+  if(undoEl) undoEl.classList.add("hidden");
+}
+function undoShow(){
+  if(BOT || !undoEl) return;
+  undoEl.classList.remove("hidden");
+  if(undoTimer) clearTimeout(undoTimer);
+  undoTimer = setTimeout(undoHide, 3000);
+}
+
+/* 暂停：Esc（桌面）/ 右上 ⏸（手机）—— 面板里也有「回到选角页」 */
+var paused = false;
+function pauseShow(){
+  if(BOT || paused || !S || S.ended || !running) return;
+  paused = true; running = false; undoHide();
+  document.getElementById("pause").classList.remove("hidden");
+  syncPad();
+}
+function pauseHide(silent){
+  if(!paused) return;
+  paused = false;
+  document.getElementById("pause").classList.add("hidden");
+  if(!silent && S && !S.ended){ running = true; last = performance.now(); }
+  syncPad();
+}
 function endGame(){
   if(S.ended) return;
+  undoHide();
   S.ended = true; running = false; musicStop(); sfx("fan");
   setHud(false);
   var score = Math.max(0, Math.min(100, Math.round(R.score(S))));
@@ -553,12 +667,16 @@ function endGame(){
   var er = document.getElementById("endRoles");
   er.innerHTML = "";
   ["chef","foh","guest"].forEach(function(id){
-    var sp = document.createElement("span");
+    var m = ROLES[id];
     var b = 0; try{ b = parseInt(localStorage.getItem("stk_best_" + id) || "0", 10) || 0; }catch(e){}
-    sp.textContent = (id === R.id ? "▶ " : "") + ROLES[id].name2 + " 最高 " + (b ? b : "—");
-    sp.title = "换这个角色再来一局";
-    sp.addEventListener("click", function(){ setRole(id); musicStart(); });
-    er.appendChild(sp);
+    var el = document.createElement("button");
+    el.className = "ecard" + (id === R.id ? " me" : "");
+    el.setAttribute("data-role", id);
+    el.style.setProperty("--ac", m.ac);
+    el.innerHTML = "<i>" + (m.em || "") + "</i><b>" + m.name2 + "</b><s>" + (b ? "最高 " + b : "还没玩") + "</s>";
+    el.title = "换 " + m.name2 + " 开一局";
+    el.addEventListener("click", function(){ setRole(id); musicStart(); sfx("click"); });
+    er.appendChild(el);
   });
   document.getElementById("end").classList.remove("hidden");
 }
@@ -573,6 +691,9 @@ document.addEventListener("keydown", function(e){
   if(k === "arrowright" || k === "d") HOLD.right = true;
   if(k === "m") toggleMute();
   if(k === "f") toggleFs();
+  if(e.key === "Escape" && !(typeof introOn !== "undefined" && introOn)){
+    if(paused) pauseHide(); else pauseShow();
+  }
 });
 document.addEventListener("keyup", function(e){
   var k = e.key.toLowerCase();
@@ -633,6 +754,7 @@ syncFs();
 function syncPad(){
   var up = !document.getElementById("start").classList.contains("hidden")
         || !document.getElementById("end").classList.contains("hidden")
+        || !document.getElementById("pause").classList.contains("hidden")
         || !document.getElementById("icv").classList.contains("hide");
   document.body.classList.toggle("panelup", up);
 }
@@ -2133,6 +2255,21 @@ function lastRole(){
   if(ib) ib.addEventListener("click", function(){ introPlay(); });
   var ab = document.getElementById("againBtn");
   if(ab) ab.addEventListener("click", function(){ reset(); musicStart(); });
+  /* ---- 上一级：换角色 / 回选角页 / 反悔窗 / 暂停 ---- */
+  var nb = document.getElementById("nextBtn");
+  if(nb) nb.addEventListener("click", pickNext);
+  var bb = document.getElementById("backBtn");
+  if(bb) bb.addEventListener("click", function(){ sfx("click"); backToPick(); });
+  var ub = document.getElementById("undo");
+  if(ub) ub.addEventListener("click", function(){ sfx("click"); backToPick(); });
+  var pb = document.getElementById("pauseBtn");
+  if(pb) pb.addEventListener("click", function(){ if(paused) pauseHide(); else pauseShow(); });
+  var r1 = document.getElementById("pResume");
+  if(r1) r1.addEventListener("click", function(){ pauseHide(); });
+  var r2 = document.getElementById("pRestart");
+  if(r2) r2.addEventListener("click", function(){ pauseHide(true); reset(); musicStart(); });
+  var r3 = document.getElementById("pBack");
+  if(r3) r3.addEventListener("click", function(){ sfx("click"); backToPick(); });
   var sv = document.getElementById("saveBtn");
   if(sv) sv.addEventListener("click", function(){ if(S && S.ended) saveCard(); });
   var cp = document.getElementById("copyBtn");
@@ -2183,9 +2320,13 @@ window.__game = {
     if(S){ render(dt); hudRender(); }
     return S ? { t: +S.t.toFixed(2), ended: !!S.ended } : null;
   },
-  resume: function(){ if(S && !S.ended){ running = true; last = performance.now(); } },
+  resume: function(){ pauseHide(true); if(S && !S.ended){ running = true; last = performance.now(); } },
   act: function(a){ if(S && R && R.act) R.act(S, a); },
   intro: function(on){ on ? introPlay(true) : introHide(); },
+  showStart: showStart, pickNext: pickNext, backToPick: backToPick,
+  pauseShow: pauseShow, pauseHide: pauseHide, undoShow: undoShow, undoHide: undoHide,
+  get paused(){ return paused; },
+  get navOn(){ return navOn; },
   roles_meta: function(){
     return ["chef", "foh", "guest"].map(function(id){
       var r = ROLES[id];
