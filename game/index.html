@@ -1,0 +1,2221 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>我要吃牛排 · 60 秒</title>
+<script>window.__errs = []; window.onerror = function(m,s,l,c){ window.__errs.push(m + " @" + l + ":" + c); };</script>
+<style>
+  :root{
+    --ink:#231d1a; --ink2:#6d5c52; --line:#e2d8cc; --cream:#faf6f1; --card:#fff;
+    --steel:#9aa3aa; --flame:#f0801f; --blood:#b3323c; --wine:#6d2230; --herb:#4e7a4a; --gold:#c8901a;
+    --ok:#33885c; --danger:#c8342f;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:none;
+    background:#1a1614;color:var(--ink);
+    font-family:"PingFang SC","Microsoft YaHei","Hiragino Sans GB",system-ui,-apple-system,"Segoe UI",sans-serif;}
+  #stage{position:fixed;inset:0;overflow:hidden;
+    background:#1a1614 radial-gradient(130% 88% at 50% 46%, #2c231d 0%, #1e1815 58%, #161211 100%)}
+  #world{position:absolute;left:0;top:0;width:960px;height:600px;overflow:hidden;border-radius:12px;
+    background:#241d19;box-shadow:0 18px 46px rgba(0,0,0,.5)}
+  #world canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+  #ui{position:absolute;inset:0;z-index:20;pointer-events:none}
+
+  /* ---------- HUD ---------- */
+  #hud{position:absolute;left:0;right:0;top:0;max-width:var(--hudw,1000px);margin:0 auto;
+    padding:calc(9px + env(safe-area-inset-top)) 10px 8px;display:flex;gap:10px;align-items:flex-start;
+    pointer-events:none;font-size:13px}
+  .meter{flex:1 1 0;min-width:0;background:rgba(28,23,20,.80);border:1px solid rgba(255,255,255,.13);border-radius:12px;
+    padding:6px 9px 7px;backdrop-filter:blur(4px)}
+  .meter .lbl{display:flex;justify-content:space-between;gap:5px;font-weight:700;letter-spacing:.4px;font-size:12px;
+    color:#cbbfb4;white-space:nowrap}
+  .lbl > span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .meter .lbl b{color:#fff;font-size:14px}
+  .bar{position:relative;height:11px;border-radius:7px;background:rgba(255,255,255,.13);margin-top:5px;overflow:hidden}
+  .bar > i{position:absolute;left:0;top:0;bottom:0;border-radius:7px;transition:width .12s linear}
+  #m1fill{background:linear-gradient(90deg,#ffc46b,var(--flame))}
+  #m2fill{background:linear-gradient(90deg,#e8b7a0,var(--blood))}
+  .zone{position:absolute;top:0;bottom:0}
+  .zone.dry{background:rgba(200,52,47,.20)}
+  .zone.ok{background:rgba(51,136,92,.30);border-left:1px solid rgba(120,220,170,.75);border-right:1px solid rgba(120,220,170,.75)}
+  .zone.risk{background:rgba(200,52,47,.22)}
+  .mark{position:absolute;top:-2px;bottom:-2px;width:2px;background:#fff;opacity:.85}
+  .warnChip{font-size:11px;font-weight:800;padding:1px 7px;border-radius:999px;color:#fff;background:var(--danger);
+    opacity:0;transition:opacity .15s;white-space:nowrap}
+  #right{display:flex;flex:0 0 auto;gap:8px;align-items:center;background:rgba(28,23,20,.80);border:1px solid rgba(255,255,255,.13);
+    border-radius:12px;padding:7px 11px;font-weight:800;font-size:15px;color:#fff;white-space:nowrap;
+    pointer-events:auto;position:relative;z-index:35}
+  #combo{color:#ffc46b;font-size:12px;font-weight:800}
+  .meter,#clock,.tsec,#combo{transition:opacity .18s}
+  body.nohud .meter,body.nohud #clock,body.nohud .tsec,body.nohud #combo{opacity:0}
+  body.hudc #hud{font-size:12px;gap:7px;padding:calc(7px + env(safe-area-inset-top)) 8px 6px}
+  body.hudc .meter{padding:4px 7px 5px;border-radius:10px}
+  body.hudc .meter .lbl{font-size:11px}
+  body.hudc .meter .lbl b{font-size:12.5px}
+  body.hudc .bar{height:9px;margin-top:4px}
+  body.hudc .sub{display:none}
+  body.hudc #right{padding:5px 8px;font-size:13px;gap:6px}
+  body.hudc #combo{display:none}
+  #mute,#fs{cursor:pointer;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.10);color:#fff;
+    border-radius:9px;padding:3px 8px;font-size:14px}
+
+  /* ---------- toasts ---------- */
+  #toasts{position:absolute;left:0;right:0;top:104px;max-width:var(--hudw,1000px);margin:0 auto;
+    display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:none}
+  .toast{background:#2b2320;color:#fff;font-size:13px;font-weight:700;border-radius:20px;padding:5px 13px;
+    border:1px solid rgba(255,255,255,.14);
+    animation:tin .25s ease-out, tout .5s ease-in 1.5s forwards;white-space:nowrap}
+  .toast.warn{background:#b3323c}
+  .toast.good{background:#33885c}
+  @keyframes tin{from{transform:translateY(-8px) scale(.94);opacity:0}}
+  @keyframes tout{to{transform:translateY(-10px);opacity:0}}
+
+  /* ---------- panels ---------- */
+  .panel{position:absolute;inset:0;z-index:30;overflow-y:auto;overscroll-behavior:contain;pointer-events:auto;
+    padding:22px 22px calc(var(--padh,84px) + 26px);background:rgba(20,16,14,.93);backdrop-filter:blur(6px);text-align:center;color:#f3ece5}
+  .panel > .in{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}
+  #icv{position:absolute;inset:auto;z-index:45;background:#191412;pointer-events:auto;border-radius:12px}
+  #icv.hide{display:none}
+  .panel.hidden{display:none}
+  .panel h1{margin:0;font-size:31px;letter-spacing:1px;color:#fff}
+  .panel h1 small{display:block;font-size:13px;font-weight:600;color:#bfae9f;letter-spacing:2px;margin-top:6px}
+  .panel h2{margin:2px 0 0;font-size:16px;color:#e8dcc8;letter-spacing:1px;font-weight:800}
+  .rules{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;max-width:680px}
+  .rules span{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);border-radius:999px;
+    padding:5px 11px;font-size:12.5px;color:#d6c8bb}
+  .rules span b{color:#fff}
+  .rules .rline{width:100%;text-align:left;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);
+    border-left:4px solid #f0801f;border-radius:10px;padding:7px 11px;font-size:12.5px;color:#e2d6c8;line-height:1.6}
+  .rules .rline b{color:#fff}
+  .rules .rhint{width:100%;text-align:center;font-size:11.5px;color:#9c8d80;margin-top:2px}
+  .rules .k{background:rgba(240,128,31,.14);border-color:rgba(240,128,31,.45)}
+  button{font-family:inherit;cursor:pointer;border:0;border-radius:13px;padding:11px 22px;font-size:15px;font-weight:800;
+    background:linear-gradient(180deg,#e0762a,#b9541a);color:#fff;box-shadow:0 4px 14px rgba(224,118,42,.35)}
+  button.ghost{background:transparent;color:#f3ece5;border:1px solid rgba(255,255,255,.24);box-shadow:none}
+  .hint{font-size:12px;color:#a99a8d}
+  .foot{max-width:660px;font-size:11.5px;color:#9c8d80;line-height:1.6;margin:2px 0 0}
+
+  /* ---------- 角色卡 ---------- */
+  #cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px;max-width:880px;width:100%}
+  .rcard{background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:14px 13px;
+    cursor:pointer;text-align:left;transition:transform .1s,border-color .15s,background .15s;position:relative;overflow:hidden}
+  .rcard:hover{transform:translateY(-2px);background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.3)}
+  .rcard .em{font-size:30px;line-height:1}
+  .rcard h3{margin:8px 0 3px;font-size:17px;color:#fff;letter-spacing:.5px}
+  .rcard .k2{font-size:11.5px;color:#a99a8d;letter-spacing:.5px}
+  .rcard .hook{margin:8px 0 0;font-size:12.5px;color:#e8dcc8;line-height:1.55;border-left:3px solid var(--ac,#f0801f);padding-left:8px}
+  .rcard .axes{margin:7px 0 0;font-size:12px;color:#cabbb0}
+  .rcard .go{margin-top:10px;font-size:12.5px;font-weight:800;color:var(--ac,#f0801f)}
+  .rcard.chef{--ac:#f0801f} .rcard.foh{--ac:#c9556b} .rcard.guest{--ac:#e0a06a}
+  @media (max-width:700px){ #cards{grid-template-columns:1fr} }
+
+  /* ---------- end ---------- */
+  #endTitle{font-size:26px;font-weight:900;color:#f0801f}
+  #endTitle.gold{color:var(--gold)}
+  #endStats{display:grid;grid-template-columns:repeat(5,minmax(62px,1fr));gap:7px;max-width:700px;width:100%}
+  #endStats div{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);border-radius:12px;padding:8px 6px}
+  #endStats b{display:block;font-size:19px;color:#fff}
+  #endStats i{font-style:normal;font-size:11.5px;color:#b7a89b}
+  #cf{background:rgba(240,128,31,.12);border:1px dashed rgba(240,128,31,.5);color:#f0c9a0;border-radius:12px;
+    padding:9px 13px;font-size:13px;max-width:660px;line-height:1.6}
+  #share{width:100%;max-width:700px;height:74px;border-radius:12px;border:1px solid rgba(255,255,255,.16);padding:9px;
+    font-family:inherit;font-size:12.5px;color:#e8dcc8;resize:none;background:rgba(255,255,255,.05);text-align:left}
+  .row{display:flex;gap:9px;flex-wrap:wrap;justify-content:center}
+  #endRoles{display:flex;gap:7px;flex-wrap:wrap;justify-content:center}
+  #endRoles span{font-size:12px;color:#b7a89b;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.13);
+    border-radius:999px;padding:4px 10px;cursor:pointer}
+  #endRoles span:hover{color:#fff;border-color:rgba(255,255,255,.32)}
+
+  /* ---------- 底部悬浮操作条 ---------- */
+  #pad{position:fixed;left:0;right:0;bottom:0;z-index:70;display:flex;gap:9px;justify-content:center;
+    padding:8px 10px calc(8px + env(safe-area-inset-bottom));pointer-events:none;transition:opacity .18s}
+  #pad > div{pointer-events:auto;flex:1 1 0;max-width:190px;background:rgba(38,31,27,.90);border:1px solid rgba(255,255,255,.16);
+    border-radius:16px;padding:15px 0;text-align:center;font-weight:800;font-size:17px;color:#e8dcc8;
+    user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;touch-action:none;
+    backdrop-filter:blur(6px);box-shadow:0 8px 22px rgba(0,0,0,.4);transition:transform .08s,background .08s}
+  #pad > div:active{transform:translateY(1px) scale(.985);background:rgba(60,48,42,.95)}
+  #pad > div[data-act="main"]{max-width:280px;background:linear-gradient(180deg,#e0762a,#b9541a);color:#fff;
+    border-color:transparent;font-size:16px}
+  body.panelup #pad{opacity:.22}
+  body.panelup #pad > div{pointer-events:none}
+  #rot{position:absolute;left:0;right:0;bottom:calc(var(--padh,84px) + 16px);text-align:center;font-size:13px;
+    color:#e8dcc8;opacity:0;transition:opacity .25s;pointer-events:none;z-index:15}
+  body.portrait #rot{opacity:.92}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="world">
+    <canvas id="cv"></canvas>
+  </div>
+
+  <div id="ui">
+    <div id="hud">
+      <div class="meter">
+        <div class="lbl"><span id="m1lbl">核心温度<span class="sub"> · 三分熟 54.5–59.5℃</span></span><span id="m1flash" class="warnChip"></span><b id="m1val">20</b></div>
+        <div class="bar"><i id="m1fill" style="width:20%"></i>
+          <span class="zone dry" id="z1a" style="left:0;width:52%"></span>
+          <span class="zone ok" id="z1b" style="left:52%;width:5%"></span>
+          <span class="zone risk" id="z1c" style="left:57%;width:43%"></span>
+          <span class="mark" id="m1mkA" style="left:54.5%"></span>
+          <span class="mark" id="m1mkB" style="left:59.5%"></span></div>
+      </div>
+      <div class="meter">
+        <div class="lbl"><span id="m2lbl">焦壳<span class="sub"> · 合格 ≥60</span></span><b id="m2val">0</b></div>
+        <div class="bar"><i id="m2fill" style="width:0%"></i>
+          <span class="zone dry" id="z2a" style="left:0;width:60%"></span>
+          <span class="zone ok" id="z2b" style="left:60%;width:40%"></span>
+          <span class="zone dry" id="z2c" style="left:100%;width:0;display:none"></span>
+          <span class="mark" id="m2mkA" style="left:60%"></span></div>
+      </div>
+      <div id="right"><span id="clock">60</span><span class="tsec">s</span><span id="combo"></span><span id="mute" title="静音 / M">🔊</span><span id="fs" title="全屏 / F">⛶</span></div>
+    </div>
+
+    <div id="toasts"></div>
+    <canvas id="icv" width="960" height="600" class="hide"></canvas>
+
+    <div class="panel" id="start">
+      <div class="in">
+        <h1>我要吃牛排<small>60 秒 · 一块肉，三个位置</small></h1>
+        <h2>开场选角色 —— 你要站在哪一边？</h2>
+        <div id="cards">
+          <div class="rcard chef" data-role="chef">
+            <div class="em">🔥</div>
+            <h3>① 厨师</h3>
+            <div class="k2">后厨 · 一块肉两个数</div>
+            <p class="hook">焦壳是一条线，过了就是碳。</p>
+            <div class="axes">轴 A 核心温度（三分熟 54.5–59.5℃）<br>轴 B 焦壳（≥60 合格，≥100 报废）</div>
+            <div class="go">▶ 选这个角色</div>
+          </div>
+          <div class="rcard foh" data-role="foh">
+            <div class="em">🍷</div>
+            <h3>② 服务员</h3>
+            <div class="k2">前厅 · 一双手四张桌</div>
+            <p class="hook">三分熟不是 Medium。</p>
+            <div class="axes">轴 A 四桌耐心（跌破 25 投诉）<br>轴 B 营业额（西冷 268 ＋ 配酒 88/128）</div>
+            <div class="go">▶ 选这个角色</div>
+          </div>
+          <div class="rcard guest" data-role="guest">
+            <div class="em">📱</div>
+            <h3>③ 客人</h3>
+            <div class="k2">餐桌 · 一块在凉的牛排</div>
+            <p class="hook">手机先吃，牛排先凉。</p>
+            <div class="axes">轴 A 入口温度（≥55℃ 才涨分）<br>轴 B 满足度（连吃 3 口 ×1.35）</div>
+            <div class="go">▶ 选这个角色</div>
+          </div>
+        </div>
+        <div class="rules" id="startRules"></div>
+        <button id="startBtn">▶ 用上次的角色再来一局</button>
+        <button id="introBtn" class="ghost">▶ 看开场 4 秒（八档熟度）</button>
+        <div class="hint">最高分：<b id="bestLine0">—</b></div>
+        <div class="rules"><a class="rline" href="../" style="text-decoration:none"><b>📖 看完整《牛排熟度指南》</b>14 节手绘版：八档熟度／触感／煎制时间／酱汁／配酒／安全底线</a></div>
+        <div class="foot">同一个 60 秒，三个位置：厨师定义这块肉，服务员传递它，客人承担结果。三个角色共用一套引擎，分数各自记录。</div>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="end">
+      <div class="in">
+        <div id="endTitle">—</div>
+        <div id="endStats">
+          <div><b id="s1">0</b><i id="s1l">—</i></div>
+          <div><b id="s2">0</b><i id="s2l">—</i></div>
+          <div><b id="s3">0</b><i id="s3l">—</i></div>
+          <div><b id="s4">0</b><i id="s4l">—</i></div>
+          <div><b id="s5">0</b><i id="s5l">—</i></div>
+        </div>
+        <div id="cf">—</div>
+        <textarea id="share" readonly></textarea>
+        <div class="row">
+          <button id="againBtn">再来一局（同角色）</button>
+          <button class="ghost" id="saveBtn">保存成绩卡（图片）</button>
+          <button class="ghost" id="copyBtn">复制成绩文案</button>
+        </div>
+        <div id="endRoles"></div>
+        <div class="hint" id="bestLine">最高分：<b id="best1">—</b></div>
+        <div class="hint">点「保存成绩卡」发到群里 —— 三个人三张卡，看谁先当上「焦壳是一条线的钟表匠」</div>
+        <div class="rules"><a class="rline" href="../" style="text-decoration:none"><b>📖 想认真学？看完整《牛排熟度指南》</b>这局里用到的八档熟度／触感／煎制时间／配酒，指南里有 14 节</a></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="rot">↻ 横屏更宽敞（竖屏也能玩）</div>
+</div>
+
+<div id="pad">
+  <div data-act="left">◀</div><div data-act="main" id="padMain">出锅</div><div data-act="right">▶</div>
+</div>
+
+<script>
+"use strict";
+/* QR: https://dukewang01.github.io/steak-guide/game/ （构建期 segno 生成，共 33 个模块） */
+var QR_N = 33, QR_BITS = "111111101100000010010011001111111100000100001011011101101101000001101110101100111001000000001011101101110101111000000000011101011101101110100110100010100001001011101100000101010001000110100101000001111111101010101010101010101111111000000001110101101001100100000000010101111111001000010101011101101110010000011011110001000111100011010110110000111011010000001110111101111000111101000100110111011010110011100011110110101100111101001101011011110001101011010101010111011010100101110111001101011101010010100000111011000010101101100010100111100010110001111111101010010101101001101000010000101110101010010110110010001100001000011000111111100011100011100011110010100010100000110101000001010100110100010000111011100011100001100011001111111000111010100110010110001111101011010011001111101100111011011010101111101000110011001111111110010000000001000001011010101100011011111111101001010001001000101011110100000101001100101010110100010010101110100111100111111100111111010101110101101001000100101001011110101110100000001110100011110011001100000101011101101111111100001000111111100001100000011110110011010";
+/* ================= core.js ================= */
+/* ==================================================================
+   我要吃牛排 · 60 秒 —— 共用引擎（一壳三关）
+   零外部依赖 · 单文件 · 离线可玩
+   ================================================================== */
+var Q = new URLSearchParams(location.search);
+var BOT = Q.get("bot") === "1";
+var SPEED = Math.max(0.5, Math.min(16, parseFloat(Q.get("speed") || "1") || 1));
+var ROLEQ = (Q.get("role") || "").toLowerCase();
+
+var W = 960, H = 600;
+var cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+function fit(){
+  var dpr = Math.min(2, window.devicePixelRatio || 1);
+  cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+var HUDCUT = 66;
+function measureHud(){
+  var r = cv.getBoundingClientRect(), h = document.getElementById("hud").getBoundingClientRect();
+  if(r.height > 0 && h.height > 0) HUDCUT = Math.min(H, Math.max(0, (h.bottom - r.top) * (H / r.height)));
+}
+var stageEl = document.getElementById("stage"), worldEl = document.getElementById("world"),
+    padEl = document.getElementById("pad"), SCALE = 1;
+function layout(){
+  var vw = stageEl.clientWidth || window.innerWidth, vh = stageEl.clientHeight || window.innerHeight;
+  var pr = padEl.getBoundingClientRect();
+  var padH = Math.round((pr.height || 72) + Math.max(0, vh - pr.bottom));
+  var availH = Math.max(150, vh - padH - 10);
+  var s = Math.max(0.16, Math.min(3, Math.min(vw / W, availH / H)));
+  SCALE = s;
+  var bw = Math.round(W*s), bh = Math.round(H*s), bl = Math.round((vw - bw)/2);
+  worldEl.style.width = bw + "px"; worldEl.style.height = bh + "px";
+  worldEl.style.left = bl + "px"; worldEl.style.top = "0px";
+  var ic = document.getElementById("icv");
+  if(ic){ ic.style.left = bl + "px"; ic.style.top = "0px"; ic.style.width = bw + "px"; ic.style.height = bh + "px"; }
+  var rs = document.documentElement.style;
+  rs.setProperty("--padh", padH + "px");
+  rs.setProperty("--hudw", Math.round(Math.min(1000, bw)) + "px");
+  document.body.classList.toggle("hudc", bw < 720);
+  document.body.classList.toggle("portrait", vh > vw*1.05 && (availH/H) > (vw/W)*1.35);
+  var hudBottom = Math.round(document.getElementById("hud").getBoundingClientRect().bottom);
+  var freeTop = hudBottom + 8, freeH = Math.max(120, (vh - padH - 8) - freeTop);
+  var top = (bh <= freeH - 2) ? Math.round(freeTop + (freeH - bh)/2) : 0;
+  worldEl.style.top = top + "px";
+  fit(); measureHud();
+}
+window.addEventListener("resize", layout);
+window.addEventListener("orientationchange", function(){ setTimeout(layout, 220); });
+if(window.visualViewport) window.visualViewport.addEventListener("resize", layout);
+["fullscreenchange","webkitfullscreenchange"].forEach(function(ev){
+  document.addEventListener(ev, function(){ setTimeout(layout, 60); syncFs(); });
+});
+layout(); window.addEventListener("load", layout);
+
+/* ============================ audio ============================ */
+var AC=null, master=null, steps=0, nextT=0, musicOn=false, muted=false, mtimer=null;
+function audioInit(){
+  if(AC) return;
+  try{
+    var K = window.AudioContext || window.webkitAudioContext; if(!K) return;
+    AC = new K(); master = AC.createGain(); master.gain.value = 0.26; master.connect(AC.destination);
+  }catch(e){ AC = null; }
+}
+function m2f(m){ return 440*Math.pow(2,(m-69)/12); }
+function tone(f,t,dur,type,vol){
+  if(!AC||muted) return;
+  var o=AC.createOscillator(), g=AC.createGain();
+  o.type=type||"square"; o.frequency.setValueAtTime(f,t);
+  g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(vol||0.18,t+0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.connect(g); g.connect(master); o.start(t); o.stop(t+dur+0.03);
+}
+function sweep(f0,f1,t,dur,type,vol){
+  if(!AC||muted) return;
+  var o=AC.createOscillator(), g=AC.createGain();
+  o.type=type||"sine"; o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(Math.max(30,f1),t+dur);
+  g.gain.setValueAtTime(vol||0.16,t); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.connect(g); g.connect(master); o.start(t); o.stop(t+dur+0.03);
+}
+function noise(t,dur,vol,hp){
+  if(!AC||muted) return;
+  var n = Math.max(1,Math.floor(AC.sampleRate*dur)), b = AC.createBuffer(1,n,AC.sampleRate), d = b.getChannelData(0);
+  for(var i=0;i<n;i++){ d[i] = (Math.random()*2-1)*(1-i/n); }
+  var s = AC.createBufferSource(); s.buffer = b;
+  var f = AC.createBiquadFilter(); f.type="highpass"; f.frequency.value = hp||1800;
+  var g = AC.createGain(); g.gain.value = vol||0.12;
+  s.connect(f); f.connect(g); g.connect(master); s.start(t);
+}
+/* 厨房味：Am7 – Dm7 – G7 – Fmaj7（爵士小七，比大三和弦更像后厨） */
+var CHORDS = [ [57,60,64,67], [50,53,57,60], [55,59,62,65], [53,57,60,64] ];
+function bpm(){ return 108 + (S && S.t > 40 ? 34 : (S && S.t > 20 ? 14 : 0)); }
+function schedule(){
+  if(!musicOn||!AC) return;
+  var spb = 60/bpm()/4;
+  while(nextT < AC.currentTime + 0.18){
+    var st = steps % 16, bar = Math.floor(steps/16) % 4, ch = CHORDS[bar];
+    if(st%4===0) tone(m2f(ch[0]-24), nextT, spb*2.6, "triangle", 0.20);
+    if([0,2,4,6,8,10,12,14].indexOf(st)>=0){
+      var seq = [0,1,2,3,2,1,2,3][ (st/2)%8 ];
+      tone(m2f(ch[seq]+12), nextT, spb*1.4, "square", 0.062);
+    }
+    if(st%8===6) noise(nextT, 0.05, 0.045, 6000);          /* 高频沙沙：像油锅 */
+    steps++; nextT += spb;
+  }
+}
+function musicStart(){
+  audioInit(); if(!AC||musicOn) return;
+  try{ if(AC.state==="suspended") AC.resume(); }catch(e){}
+  musicOn = true; steps = 0; nextT = AC.currentTime + 0.06;
+  mtimer = setInterval(schedule, 25);
+}
+function musicStop(){ musicOn = false; if(mtimer){ clearInterval(mtimer); mtimer = null; } }
+function sfx(kind){
+  if(!AC||muted) return; var t = AC.currentTime + 0.001;
+  if(kind==="sear"){ noise(t,0.30,0.13,2600); }
+  else if(kind==="flip"){ noise(t,0.10,0.10,4200); sweep(420,180,t,0.12,"triangle",0.10); }
+  else if(kind==="hot"){ noise(t,0.22,0.11,2000); sweep(220,90,t,0.24,"sine",0.12); }
+  else if(kind==="bell"){ tone(1568,t,0.16,"triangle",0.16); tone(1046,t+0.13,0.30,"triangle",0.12); }
+  else if(kind==="coin"){ tone(1318,t,0.07,"square",0.13); tone(1760,t+0.06,0.10,"square",0.11); }
+  else if(kind==="wrong"){ sweep(240,120,t,0.30,"sawtooth",0.18); }
+  else if(kind==="click"){ tone(1180,t,0.05,"square",0.12); }
+  else if(kind==="cut"){ noise(t,0.08,0.10,3000); tone(520,t,0.05,"triangle",0.09); }
+  else if(kind==="bite"){ noise(t,0.10,0.09,1400); tone(300,t,0.06,"triangle",0.08); }
+  else if(kind==="sip"){ noise(t,0.12,0.06,900); sweep(600,300,t,0.14,"sine",0.10); }
+  else if(kind==="shutter"){ noise(t,0.06,0.16,3000); noise(t+0.07,0.05,0.14,3000); }
+  else if(kind==="sad"){ sweep(320,110,t,0.34,"sawtooth",0.16); }
+  else if(kind==="fan"){ [0,4,7,12].forEach(function(n,i){ tone(m2f(69+n),t+i*0.11,0.26,"square",0.14); }); }
+}
+
+/* ============================ toasts ============================ */
+var toastBox = document.getElementById("toasts");
+function toast(kind, txt){
+  var d = document.createElement("div");
+  d.className = "toast" + (kind==="warn"?" warn":(kind==="good"?" good":""));
+  d.textContent = txt;
+  toastBox.appendChild(d);
+  setTimeout(function(){ d.remove(); }, 2100);
+  while(toastBox.children.length > 3) toastBox.firstChild.remove();
+}
+var lastToast = {};
+function say(key, cls, msg, cool){
+  var now = performance.now();
+  if(lastToast[key] && now - lastToast[key] < (cool||2500)) return;
+  lastToast[key] = now;
+  toast(cls, msg);
+}
+
+/* ============================ 粒子 / 浮字 ============================ */
+var S = null, R = null, running = false, last = 0;
+function burst(x,y,col,n,spd){
+  if(!S) return;
+  for(var i=0;i<n;i++){
+    var a = Math.random()*6.284;
+    S.parts.push({x:x,y:y,vx:Math.cos(a)*spd*(0.4+Math.random()),vy:Math.sin(a)*spd*0.7-60,
+      r:2+Math.random()*3.4, c:col, life:0.5+Math.random()*0.4});
+  }
+}
+function floatTxt(x,y,txt,col,size){ if(S) S.floats.push({x:x,y:y,txt:txt,c:col,life:1.2,sz:size||17}); }
+function drawParts(dt){
+  for(var i=S.parts.length-1;i>=0;i--){
+    var p = S.parts[i];
+    p.x += p.vx*dt; p.y += p.vy*dt; p.vy += 900*dt; p.life -= dt;
+    if(p.life <= 0){ S.parts.splice(i,1); continue; }
+    ctx.globalAlpha = Math.max(0, Math.min(1, p.life*2));
+    ctx.fillStyle = p.c;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,6.284); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  for(var j=S.floats.length-1;j>=0;j--){
+    var f = S.floats[j]; f.y -= 34*dt; f.life -= dt;
+    if(f.life<=0){ S.floats.splice(j,1); continue; }
+    ctx.globalAlpha = Math.max(0,Math.min(1,f.life*1.4));
+    ctx.fillStyle = f.c; ctx.font = "800 " + (f.sz||17) + "px system-ui,sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(f.txt, f.x, f.y);
+  }
+  ctx.textAlign = "left"; ctx.globalAlpha = 1;
+}
+function roundRect(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath();
+}
+/* 八个熟度的中心肉色（取自指南 §01 色卡，越熟越灰褐） */
+var DONENESS = [
+  {zh:"蓝标", en:"Blue Rare", t:46, c:"#a8232c", c2:"#c8455a"},
+  {zh:"一分熟", en:"Rare", t:50, c:"#b03036", c2:"#d1556a"},
+  {zh:"三分熟", en:"Medium Rare", t:57, c:"#bc4237", c2:"#dc7264"},
+  {zh:"五分熟", en:"Medium", t:63, c:"#a8552f", c2:"#c8805a"},
+  {zh:"七分熟", en:"Medium Well", t:68, c:"#94624a", c2:"#b08a74"},
+  {zh:"全熟", en:"Well Done", t:74, c:"#8a7364", c2:"#a89888"},
+  {zh:"过熟", en:"Overcooked", t:82, c:"#7d6c60", c2:"#9a8c80"},
+  {zh:"碳", en:"Carbon", t:96, c:"#3f3a36", c2:"#5b5450"}
+];
+function donenessByTemp(t){
+  var d = DONENESS[0];
+  for(var i=0;i<DONENESS.length;i++){ if(t >= DONENESS[i].t - 3.5) d = DONENESS[i]; }
+  return d;
+}
+/* 温度 → 肉色渐变（画面上牛排切面用） */
+function lerpC(a,b,k){
+  function p(h){ return [parseInt(h.substr(1,2),16),parseInt(h.substr(3,2),16),parseInt(h.substr(5,2),16)]; }
+  var A=p(a), B=p(b);
+  return "rgb(" + Math.round(A[0]+(B[0]-A[0])*k) + "," + Math.round(A[1]+(B[1]-A[1])*k) + "," + Math.round(A[2]+(B[2]-A[2])*k) + ")";
+}
+function meatColor(t){
+  var lo = DONENESS[0], hi = DONENESS[DONENESS.length-1];
+  var pts = DONENESS;
+  for(var i=0;i<pts.length-1;i++){
+    if(t <= pts[i+1].t){ var k = (t - pts[i].t) / Math.max(1,(pts[i+1].t - pts[i].t)); k = Math.max(0,Math.min(1,k)); return lerpC(pts[i].c, pts[i+1].c, k); }
+  }
+  return hi.c;
+}
+
+/* ============================ HUD ============================ */
+var elClock = document.getElementById("clock"), elCombo = document.getElementById("combo");
+var el1f = document.getElementById("m1fill"), el2f = document.getElementById("m2fill");
+var el1v = document.getElementById("m1val"), el2v = document.getElementById("m2val");
+var el1l = document.getElementById("m1lbl"), el2l = document.getElementById("m2lbl");
+var el1x = document.getElementById("m1flash");
+function zoneEls(prefix, i){ return [document.getElementById(prefix + "a"), document.getElementById(prefix + "b"), document.getElementById(prefix + "c")]; }
+function applyHud(rc){
+  /* 标签 */
+  el1l.innerHTML = rc.hud.m1.lbl + (rc.hud.m1.sub ? '<span class="sub"> · ' + rc.hud.m1.sub + '</span>' : "");
+  el2l.innerHTML = rc.hud.m2.lbl + (rc.hud.m2.sub ? '<span class="sub"> · ' + rc.hud.m2.sub + '</span>' : "");
+  /* 区间 */
+  [[1, rc.hud.m1], [2, rc.hud.m2]].forEach(function(pair){
+    var i = pair[0], cfg = pair[1], els = zoneEls("z" + i, i);
+    var zs = cfg.zones || [];
+    for(var k=0;k<3;k++){
+      var e = els[k];
+      if(!e) continue;                       /* 壳里没这个槽就跳过（各关 m2 只用到 2 格） */
+      if(k < zs.length){ e.style.display = ""; e.style.left = zs[k][0] + "%"; e.style.width = Math.max(0, zs[k][1]-zs[k][0]) + "%";
+        e.className = "zone " + zs[k][2]; }
+      else e.style.display = "none";
+    }
+    var marks = cfg.marks || [];
+    [["m" + i + "mkA", 0], ["m" + i + "mkB", 1]].forEach(function(mm){
+      var e = document.getElementById(mm[0]);
+      if(!e) return;
+      if(marks.length > mm[1]){ e.style.display = ""; e.style.left = marks[mm[1]] + "%"; } else e.style.display = "none";
+    });
+  });
+  var pm = document.getElementById("padMain");
+  if(pm) pm.textContent = rc.padMain;
+  if(R) document.body.setAttribute("data-role", R.id);
+}
+function hudRender(){
+  elClock.textContent = Math.max(0, Math.ceil(C_DUR - S.t));
+  elCombo.textContent = S.comboTxt || "";
+  el1f.style.width = Math.max(0, Math.min(100, S.m1)) + "%";
+  el2f.style.width = Math.max(0, Math.min(100, S.m2)) + "%";
+  el1v.textContent = S.m1t != null ? S.m1t : Math.round(S.m1);
+  el2v.textContent = S.m2t != null ? S.m2t : Math.round(S.m2);
+}
+
+/* ============================ 状态 / 流程 ============================ */
+var C_DUR = 60;
+function reset(){
+  setHud(true);
+  S = { t:0, ended:false, combo:0, comboTxt:"", parts:[], floats:[], shake:0, m1:0, m2:0 };
+  R.init(S);
+  running = true; last = performance.now();
+  document.getElementById("end").classList.add("hidden");
+  document.getElementById("start").classList.add("hidden");
+  toastBox.innerHTML = ""; lastToast = {};
+  applyHud(R);
+  hudRender();
+}
+function setHud(on){ document.body.classList.toggle("nohud", !on); }
+function setRole(id, noStart){
+  var rc = ROLES[id]; if(!rc) rc = ROLES.chef;
+  R = rc;
+  try{ localStorage.setItem("stk_last_role", id); }catch(e){}
+  applyHud(R);
+  document.getElementById("start").querySelector("h1 small").textContent = "60 秒 · 换个身份看这块肉";
+  if(!noStart) reset();
+}
+function endGame(){
+  if(S.ended) return;
+  S.ended = true; running = false; musicStop(); sfx("fan");
+  setHud(false);
+  var score = Math.max(0, Math.min(100, Math.round(R.score(S))));
+  S.final = score;                       /* 落进状态里：复核 / 成绩卡 / 分享都读它 */
+  var title = R.title(S, score), st = R.stats(S, score);
+  var tEl = document.getElementById("endTitle");
+  tEl.textContent = "称号：" + title;
+  tEl.className = score >= 100 ? "gold" : "";
+  for(var i=1;i<=5;i++){
+    document.getElementById("s"+i).textContent = st[i-1][0];
+    document.getElementById("s"+i+"l").textContent = st[i-1][1];
+  }
+  document.getElementById("cf").textContent = R.cf(S, score);
+  document.getElementById("share").value = R.share(S, score, title);
+  var bk = "stk_best_" + R.id, best = 0;
+  try{ best = parseInt(localStorage.getItem(bk) || "0", 10) || 0; }catch(e){ best = 0; }
+  if(score > best){ best = score; try{ localStorage.setItem(bk, String(best)); }catch(e){} }
+  document.getElementById("best1").textContent = best;
+  var er = document.getElementById("endRoles");
+  er.innerHTML = "";
+  ["chef","foh","guest"].forEach(function(id){
+    var sp = document.createElement("span");
+    var b = 0; try{ b = parseInt(localStorage.getItem("stk_best_" + id) || "0", 10) || 0; }catch(e){}
+    sp.textContent = (id === R.id ? "▶ " : "") + ROLES[id].name2 + " 最高 " + (b ? b : "—");
+    sp.title = "换这个角色再来一局";
+    sp.addEventListener("click", function(){ setRole(id); musicStart(); });
+    er.appendChild(sp);
+  });
+  document.getElementById("end").classList.remove("hidden");
+}
+
+/* ============================ 输入 ============================ */
+var keys = {}, HOLD = {left:false, right:false, main:false}, HOLDT = {left:0, right:0, main:0};
+document.addEventListener("keydown", function(e){
+  var k = e.key.toLowerCase();
+  keys[k] = true;
+  if(e.code === "Space"){ e.preventDefault(); if(!HOLD.main){ press("main"); } HOLD.main = true; }
+  if(k === "arrowleft" || k === "a") HOLD.left = true;
+  if(k === "arrowright" || k === "d") HOLD.right = true;
+  if(k === "m") toggleMute();
+  if(k === "f") toggleFs();
+});
+document.addEventListener("keyup", function(e){
+  var k = e.key.toLowerCase();
+  keys[k] = false;
+  if(e.code === "Space"){ HOLD.main = false; HOLDT.main = 0; release("main"); }
+  if(k === "arrowleft" || k === "a"){ HOLD.left = false; HOLDT.left = 0; }
+  if(k === "arrowright" || k === "d"){ HOLD.right = false; HOLDT.right = 0; }
+});
+function press(a){
+  if(!running || !S || S.ended) return;
+  R.act(S, a);
+  if(a === "main") HOLDT.main = 0;
+}
+function release(a){ if(running && S && !S.ended) R.release && R.release(S, a); }
+padEl.addEventListener("pointerdown", function(e){
+  if(e.cancelable) e.preventDefault();
+  var a = e.target.getAttribute && e.target.getAttribute("data-act");
+  if(!a) return;
+  if(e.target.setPointerCapture) { try{ e.target.setPointerCapture(e.pointerId); }catch(err){} }
+  HOLD[a] = true;
+  if(a !== "main") HOLDT[a] = 0;
+  press(a);
+});
+document.addEventListener("pointerup", function(){ 
+  ["left","right","main"].forEach(function(a){ if(HOLD[a]){ HOLD[a] = false; HOLDT[a] = 0; release(a); } });
+});
+document.addEventListener("pointercancel", function(){ 
+  ["left","right","main"].forEach(function(a){ HOLD[a] = false; HOLDT[a] = 0; });
+});
+
+/* 静音 / 全屏 */
+var muteBtn = document.getElementById("mute");
+function toggleMute(){
+  muted = !muted;
+  if(master) master.gain.value = muted ? 0 : 0.26;
+  muteBtn.textContent = muted ? "🔇" : "🔊";
+}
+muteBtn.addEventListener("click", toggleMute);
+var fsBtn = document.getElementById("fs");
+function syncFs(){ if(fsBtn) fsBtn.textContent = (document.fullscreenElement || document.webkitFullscreenElement) ? "⤡" : "⛶"; }
+function toggleFs(){
+  var d = document;
+  try{
+    if(!(d.fullscreenElement || d.webkitFullscreenElement)){
+      var el = d.documentElement, rq = el.requestFullscreen || el.webkitRequestFullscreen;
+      if(rq) rq.call(el);
+    }else{
+      var ex = d.exitFullscreen || d.webkitExitFullscreen;
+      if(ex) ex.call(d);
+    }
+  }catch(e){}
+  setTimeout(layout, 80);
+}
+if(fsBtn) fsBtn.addEventListener("click", toggleFs);
+syncFs();
+
+/* 面板浮起时压暗底部操作条（几何不变，布局不跳） */
+function syncPad(){
+  var up = !document.getElementById("start").classList.contains("hidden")
+        || !document.getElementById("end").classList.contains("hidden")
+        || !document.getElementById("icv").classList.contains("hide");
+  document.body.classList.toggle("panelup", up);
+}
+new MutationObserver(syncPad).observe(document.body, {subtree:true, attributes:true, attributeFilter:["class"]});
+syncPad();
+
+/* ============================ loop ============================ */
+function update(dt){
+  S.t += dt;
+  if(S.t >= C_DUR){ S.t = C_DUR; endGame(); return; }
+  HOLDT.left += HOLD.left ? dt : 0; HOLDT.right += HOLD.right ? dt : 0;
+  HOLDT.main += HOLD.main ? dt : 0;
+  S.shake = Math.max(0, S.shake - dt*3.2);
+  R.update(S, dt);
+  if(BOT && R.bot) R.bot(S, dt);      /* 机器人：仅 ?bot=1 时驱动 */
+}
+function render(dt){
+  ctx.save();
+  if(S && S.shake > 0){ ctx.translate((Math.random()-.5)*14*S.shake, (Math.random()-.5)*14*S.shake); }
+  ctx.beginPath(); ctx.rect(0,0,W,H); ctx.clip();
+  R.bg(dt);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(0, HUDCUT, W, H - HUDCUT); ctx.clip();
+  R.draw(S, dt);
+  ctx.restore();
+  drawParts(dt);
+  ctx.restore();
+}
+function frame(now){
+  var dt = Math.min(0.05, (now - last) / 1000) * SPEED;
+  last = now;
+  if(running && S){ update(dt); }
+  if(S){ render(dt); hudRender(); }
+  requestAnimationFrame(frame);
+}
+
+/* ============================ 成绩卡 ============================ */
+function wrapLines(c, text, maxW){
+  var toks = text.match(/[A-Za-z0-9]+(?:[.%][A-Za-z0-9]+)*(?:[ \t]?[点杯瓶次秒个分块桌口元℃])?|[ \t]+|[\s\S]/g) || [];
+  var out = [], line = "";
+  for(var i = 0; i < toks.length; i++){
+    var t = toks[i];
+    if(/^[ \t]+$/.test(t)){ if(!line) continue; t = " "; }
+    var t2 = line + t;
+    if(c.measureText(t2).width > maxW && line){
+      if(/^[），。、」】！？；：%℃]/.test(t)){ out.push(t2); line = ""; }
+      else { out.push(line); line = t; }
+    } else line = t2;
+  }
+  if(line) out.push(line);
+  for(var k = 1; k < out.length; k++){
+    if(/^[），。、」】！？；：%℃]/.test(out[k])){
+      out[k-1] += out[k].charAt(0); out[k] = out[k].slice(1);
+      if(!out[k]){ out.splice(k, 1); k--; }
+    }
+  }
+  return out;
+}
+var SITE = "dukewang01.github.io/steak-guide/game";
+function saveCard(){
+  var score = Math.max(0, Math.min(100, Math.round(R.score(S))));
+  var title = document.getElementById("endTitle").textContent.replace("称号：", "");
+  var st = R.stats(S, score);
+  var F = "'PingFang SC','Microsoft YaHei',sans-serif";
+  var mx = document.createElement("canvas").getContext("2d");
+  var tf = 46, tl;
+  while(tf > 26){ mx.font = "900 " + tf + "px " + F; tl = wrapLines(mx, title, 780); if(tl.length <= 2) break; tf -= 2; }
+  var tstep = Math.round(tf * 1.28);
+  mx.font = "700 25px " + F;
+  var cl = wrapLines(mx, document.getElementById("cf").textContent, 700).slice(0, 5);
+  mx.font = "700 26px " + F;
+  var sl = wrapLines(mx, document.getElementById("share").value.split("#")[0].trim(), 660).slice(0, 8);
+  var cfH = 44 + cl.length * 46, shH = sl.length * 44 + 30;
+  var y0 = 186 + tl.length * tstep + 40;
+  var yNum = y0 + 130, yLab = y0 + 176, yCell = y0 + 220;
+  var yCard = yCell + 108 + 40, yCfTxt = yCard + 44;
+  var yShareBx = yCard + cfH + 46, yShareTx = yShareBx + 34;
+  var qrN = QR_N, qrMs = qrN > 40 ? 3 : 4, qrS = qrN * qrMs, qrQ = 12;
+  var qrX = 80, qrY = yShareBx + shH + 46, qrCapX = qrX + qrS + qrQ * 2 + 26;
+  var yHash = qrY + qrS + qrQ * 2 + 40, yFoot = yHash + 46;
+  var CW = 900, CH = Math.round(yFoot + 34);
+
+  var canv = document.createElement("canvas"); canv.width = CW; canv.height = CH;
+  var x = canv.getContext("2d");
+  var g = x.createLinearGradient(0, 0, 0, CH);
+  g.addColorStop(0, "#f6efe6"); g.addColorStop(.55, "#fffdfa"); g.addColorStop(1, "#f1e9df");
+  x.fillStyle = g; x.fillRect(0, 0, CW, CH);
+  x.fillStyle = R.ac; x.fillRect(0, 0, CW, 12);
+  x.textAlign = "center";
+  x.fillStyle = "#6d5c52"; x.font = "600 26px " + F;
+  x.fillText("我要吃牛排 · 60 秒　—　" + R.name, 450, 92);
+  x.fillStyle = "#231d1a"; x.font = "700 30px " + F;
+  x.fillText(R.key, 450, 136);
+  x.fillStyle = score >= 100 ? "#c8901a" : R.ac; x.font = "900 " + tf + "px " + F;
+  for(var i = 0; i < tl.length; i++) x.fillText(tl[i], 450, 186 + i * tstep);
+  x.fillStyle = "#231d1a"; x.font = "900 150px " + F; x.fillText(String(score), 450, yNum);
+  x.fillStyle = "#6d5c52"; x.font = "700 24px " + F; x.fillText(R.scoreLabel, 450, yLab);
+  var cw = 154, gap = 11, x0 = (CW - (cw * 5 + gap * 4)) / 2;
+  for(var j = 0; j < 5; j++){
+    var cx2 = x0 + j * (cw + gap);
+    x.fillStyle = "#ffffff"; x.strokeStyle = "#e2d8cc"; x.lineWidth = 2;
+    x.beginPath();
+    if(x.roundRect) x.roundRect(cx2, yCell, cw, 108, 18); else x.rect(cx2, yCell, cw, 108);
+    x.fill(); x.stroke();
+    x.fillStyle = "#231d1a"; x.font = "900 34px " + F; x.fillText(String(st[j][0]), cx2 + cw/2, yCell + 52);
+    x.fillStyle = "#6d5c52"; x.font = "600 18px " + F; x.fillText(st[j][1], cx2 + cw/2, yCell + 84);
+  }
+  x.fillStyle = "#fdf3e7"; x.strokeStyle = "#e8c39a"; x.lineWidth = 2;
+  x.beginPath();
+  if(x.roundRect) x.roundRect(70, yCard, 760, cfH, 20); else x.rect(70, yCard, 760, cfH);
+  x.fill(); x.stroke();
+  x.fillStyle = "#8a5a13"; x.font = "700 25px " + F; x.textAlign = "left";
+  for(var k2 = 0; k2 < cl.length; k2++) x.fillText(cl[k2], 96, yCfTxt + k2 * 46);
+  x.textAlign = "center";
+  x.fillStyle = "#ffffff"; x.strokeStyle = "#e2d8cc"; x.lineWidth = 2;
+  x.beginPath();
+  if(x.roundRect) x.roundRect(80, yShareBx, 740, shH, 18); else x.rect(80, yShareBx, 740, shH);
+  x.fill(); x.stroke();
+  x.fillStyle = "#231d1a"; x.font = "700 26px " + F; x.textAlign = "left";
+  for(var m = 0; m < sl.length; m++) x.fillText(sl[m], 96, yShareTx + m * 44);
+  x.fillStyle = "#ffffff"; x.strokeStyle = "#e2d8cc"; x.lineWidth = 2;
+  x.beginPath();
+  if(x.roundRect) x.roundRect(qrX - qrQ, qrY - qrQ, qrS + qrQ*2, qrS + qrQ*2, 14);
+  else x.rect(qrX - qrQ, qrY - qrQ, qrS + qrQ*2, qrS + qrQ*2);
+  x.fill(); x.stroke();
+  x.fillStyle = "#231d1a";
+  for(var r = 0; r < qrN; r++) for(var c = 0; c < qrN; c++)
+    if(QR_BITS.charAt(r * qrN + c) === "1") x.fillRect(qrX + c*qrMs, qrY + r*qrMs, qrMs, qrMs);
+  x.textAlign = "left";
+  x.fillStyle = "#231d1a"; x.font = "900 30px " + F; x.fillText("扫码来玩 →", qrCapX, qrY + 40);
+  x.fillStyle = "#6d5c52"; x.font = "700 23px " + F; x.fillText("三个角色 · 一局 60 秒 · 手机能玩", qrCapX, qrY + 78);
+  x.fillStyle = "#9c8d80"; x.font = "600 20px " + F; x.fillText(SITE, qrCapX, qrY + 112);
+  x.textAlign = "center";
+  x.fillStyle = "#6d5c52"; x.font = "700 24px " + F;
+  x.fillText("#我要吃牛排　#熟度　#焦壳", 450, yHash);
+  var d = new Date();
+  x.fillStyle = "#9c8d80"; x.font = "600 20px " + F;
+  x.fillText(d.getFullYear() + "-" + (d.getMonth()+1) + "-" + d.getDate() + "　自测成绩 · 玩法化自《牛排熟度指南 · 手绘版》", 450, yFoot);
+  try{
+    var url = canv.toDataURL("image/png");
+    window.__card = url;                       /* 供自动化复核取卡（无下载） */
+    var a = document.createElement("a"); a.href = url;
+    a.download = "牛排成绩卡_" + R.id + "_" + score + ".png";
+    document.body.appendChild(a); a.click(); a.remove();
+  }catch(e){ try{ window.open(canv.toDataURL("image/png"), "_blank"); }catch(e2){} }
+}
+
+/* ---------------- 启动主循环（必须：否则动画/计时全不动） ---------------- */
+last = performance.now();
+requestAnimationFrame(frame);
+if(icv) icv.classList.add("hide");
+/* ================= roles.js ================= */
+/* ==================================================================
+   我要吃牛排 —— 数据层 + 画布助手 + 角色注册表
+   数据全部来自《牛排熟度指南 · 手绘版》（§01–§14）
+   ================================================================== */
+
+/* ---------------- 绘图助手 ---------------- */
+function pt(s, x, y, size, col, al, wt){
+  ctx.fillStyle = col; ctx.font = (wt || 700) + " " + size + "px 'PingFang SC','Microsoft YaHei',sans-serif";
+  ctx.textAlign = al || "left"; ctx.fillText(s, x, y); ctx.textAlign = "left";
+}
+function box(x, y, w, h, r, fill, stroke, lw){
+  ctx.beginPath();
+  if(ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h);
+  if(fill){ ctx.fillStyle = fill; ctx.fill(); }
+  if(stroke){ ctx.strokeStyle = stroke; ctx.lineWidth = lw || 1.5; ctx.stroke(); }
+}
+function bar(x, y, w, h, k, fill, back){
+  box(x, y, w, h, h/2, back || "rgba(255,255,255,.16)");
+  if(k > 0) box(x, y, Math.max(2, w*Math.max(0, Math.min(1, k))), h, h/2, fill);
+}
+/* 一块牛排：外圈焦壳 + 切面色（温度决定） */
+function steakShape(cx, cy, rw, rh, crust, temp, rot){
+  var k = Math.max(0, Math.min(1, crust/100));
+  ctx.save(); ctx.translate(cx, cy); if(rot) ctx.rotate(rot);
+  ctx.beginPath(); ctx.ellipse(0, 3, rw, rh, 0, 0, 6.284);
+  ctx.fillStyle = "rgba(0,0,0,.34)"; ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, 0, rw, rh, 0, 0, 6.284);
+  ctx.fillStyle = lerpC("#9c8d80", "#2b211b", Math.min(1, k*1.05)); ctx.fill();
+  ctx.lineWidth = 3; ctx.strokeStyle = lerpC("#8a7f74", "#120e0c", k); ctx.stroke();
+  var iw = rw*0.80 - k*2, ih = rh*0.80 - k*2;
+  ctx.beginPath(); ctx.ellipse(0, -1, iw, ih, 0, 0, 6.284);
+  ctx.fillStyle = meatColor(temp); ctx.fill();
+  ctx.globalAlpha = .35; ctx.beginPath(); ctx.ellipse(-iw*0.22, -ih*0.28, iw*0.42, ih*0.36, -.25, 0, 6.284);
+  ctx.fillStyle = "#fff"; ctx.fill(); ctx.globalAlpha = 1;
+  if(k > .55){
+    for(var i = 0; i < 5; i++){
+      var a = i*1.28 + 0.4;
+      ctx.beginPath(); ctx.arc(Math.cos(a)*rw*0.72, Math.sin(a)*rh*0.72, 1.8 + k*2.2, 0, 6.284);
+      ctx.fillStyle = "rgba(20,14,10,.75)"; ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+/* 火焰（铁锅底下） */
+function flame(x, baseY, w, hgt, t, k){
+  if(k <= 0.01) return;
+  var n = 3 + Math.round(k*5);
+  for(var i = 0; i < n; i++){
+    var fx = x + w*(i + .5)/n, hh = hgt*k*(.6 + .4*Math.sin(t*7 + i*1.7));
+    var g = ctx.createLinearGradient(fx, baseY, fx, baseY - hh);
+    g.addColorStop(0, "rgba(255,170,40,.95)"); g.addColorStop(.55, "rgba(240,110,30,.72)"); g.addColorStop(1, "rgba(180,40,20,0)");
+    ctx.beginPath();
+    ctx.moveTo(fx - w/n*0.42, baseY);
+    ctx.quadraticCurveTo(fx - w/n*0.30, baseY - hh*0.55, fx, baseY - hh);
+    ctx.quadraticCurveTo(fx + w/n*0.30, baseY - hh*0.55, fx + w/n*0.42, baseY);
+    ctx.closePath(); ctx.fillStyle = g; ctx.fill();
+  }
+}
+/* 热气 */
+function steam(x, y, n, t, alpha){
+  ctx.save(); ctx.globalAlpha = alpha;
+  for(var i = 0; i < n; i++){
+    var ph = (t*0.55 + i*0.37) % 1;
+    ctx.beginPath();
+    ctx.arc(x + Math.sin((t + i)*1.6)*12, y - ph*70, 7 + ph*13, 0, 6.284);
+    ctx.fillStyle = "rgba(255,255,255," + (0.30*(1 - ph)) + ")"; ctx.fill();
+  }
+  ctx.restore();
+}
+/* 立式温度计：带区间 / 刻度 / 当前值 / 出锅后落点 */
+function gauge(x, y, w, h, lo, hi, bandLo, bandHi, val, ghost, hot){
+  box(x, y, w, h, w/2, "rgba(18,14,12,.86)", "rgba(255,255,255,.20)", 2);
+  function Y(v){ return y + h - (Math.max(lo, Math.min(hi, v)) - lo)/(hi - lo)*h; }
+  var by = Y(bandHi), bh = Y(bandLo) - by;
+  box(x + 2, by, w - 4, bh, 3, "rgba(51,136,92,.42)");
+  ctx.strokeStyle = "rgba(150,240,190,.85)"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(x - 7, by); ctx.lineTo(x + w + 7, by);
+  ctx.moveTo(x - 7, by + bh); ctx.lineTo(x + w + 7, by + bh); ctx.stroke();
+  ctx.font = "700 12px system-ui,sans-serif"; ctx.textAlign = "right";
+  ctx.fillStyle = "rgba(160,235,190,.95)";
+  ctx.fillText(Math.round(bandHi) + "℃", x - 11, by + 4);
+  ctx.fillText(Math.round(bandLo) + "℃", x - 11, by + bh + 4);
+  var step = (hi - lo) > 60 ? 20 : 10;
+  for(var v = lo; v <= hi; v += step){
+    var yy = Y(v);
+    ctx.strokeStyle = "rgba(255,255,255,.28)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x + w, yy); ctx.lineTo(x + w + 8, yy); ctx.stroke();
+  }
+  var vy = Y(val);
+  ctx.beginPath(); ctx.moveTo(x + w + 11, vy); ctx.lineTo(x + w + 40, vy);
+  ctx.lineWidth = 3; ctx.strokeStyle = hot ? "#ff8c3a" : "#ffe08a"; ctx.stroke();
+  pt(Math.round(val*10)/10 + "℃", x + w + 45, vy + 5, 15, "#fff", "left", 800);
+  if(ghost != null && ghost !== val){
+    var gy = Y(ghost);
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.moveTo(x + w + 11, gy); ctx.lineTo(x + w + 40, gy);
+    ctx.lineWidth = 2.4; ctx.strokeStyle = "rgba(255,196,107,.85)"; ctx.stroke();
+    ctx.setLineDash([]);
+    pt("出锅后 " + (Math.round(ghost*10)/10), x + w + 45, gy + 5, 11.5, "rgba(255,196,107,.9)", "left", 700);
+  }
+}
+/* 底部滑动选择条（点单/配酒答题用） */
+function sweepBar(x, y, w, h, opts, idx, rightIdx, hot){
+  box(x, y, w, h, 12, "rgba(16,12,10,.92)", "rgba(255,255,255,.22)", 2);
+  var n = opts.length, cw = (w - 10)/n;
+  for(var i = 0; i < n; i++){
+    var cx = x + 5 + i*cw;
+    if(i === idx) box(cx + 2, y + 5, cw - 4, h - 10, 9, hot ? "rgba(240,128,31,.34)" : "rgba(255,255,255,.16)", "rgba(255,255,255,.5)", 2);
+    pt(opts[i], cx + cw/2, y + h/2 + 7, i === idx ? 17 : 15.5, i === idx ? "#fff" : "#cbbfb4", "center", 800);
+  }
+  var cur = x + 5 + (idx + .5)*cw;
+  ctx.beginPath(); ctx.moveTo(cur, y - 12); ctx.lineTo(cur - 9, y - 26); ctx.lineTo(cur + 9, y - 26); ctx.closePath();
+  ctx.fillStyle = hot ? "#ff8c3a" : "#ffe08a"; ctx.fill();
+  ctx.beginPath(); ctx.moveTo(cur, y + h + 12); ctx.lineTo(cur - 9, y + h + 26); ctx.lineTo(cur + 9, y + h + 26); ctx.closePath();
+  ctx.fillStyle = hot ? "#ff8c3a" : "#ffe08a"; ctx.fill();
+}
+
+/* ---------------- 指南数据 ---------------- */
+/* §02 速查表 · 八档中心温度 */
+var DON8 = [
+  {zh:"近生", en:"Blue Rare", t:46},
+  {zh:"一分熟", en:"Rare", t:52},
+  {zh:"三分熟", en:"Medium Rare", t:57, star:1},
+  {zh:"五分熟", en:"Medium", t:63, star:1},
+  {zh:"七分熟", en:"Medium Well", t:66},
+  {zh:"全熟", en:"Well Done", t:71}
+];
+/* §06 中英对照误区：客人口头说 → 正确的英文档 */
+var SAY2EN = [
+  {say:"“三分熟”", en:"Medium Rare"},
+  {say:"“五分熟”", en:"Medium"},
+  {say:"“七分熟”", en:"Medium Well"},
+  {say:"“全熟”", en:"Well Done"},
+  {say:"“一分熟”", en:"Rare"},
+  {say:"“带血、很生”", en:"Blue Rare"}
+];
+/* §11 十五款酒（10 红 + 5 白/其它） */
+var WINE15 = [
+  {n:"赤霞珠", pair:"眼肉／西冷（脂肪足）· 黑胡椒汁", t:"17–19℃", r:1},
+  {n:"西拉", pair:"黑胡椒汁（同香呼应）· 西冷", t:"17–19℃", r:1},
+  {n:"梅洛", pair:"菲力（瘦肉）· 伯那西汁", t:"16–18℃", r:1},
+  {n:"黑皮诺", pair:"菲力 · 红酒汁 · 青酱", t:"14–16℃", r:1},
+  {n:"马尔贝克", pair:"烤牛排 · 全熟（果味补汁水）", t:"16–18℃", r:1},
+  {n:"丹魄", pair:"干式熟成（风味同源）", t:"16–18℃", r:1},
+  {n:"桑娇维塞", pair:"T 骨 · 意式牛排", t:"16–18℃", r:1},
+  {n:"内比奥罗", pair:"油脂最重的部位", t:"17–19℃", r:1},
+  {n:"仙粉黛", pair:"全熟／BBQ 酱", t:"16–18℃", r:1},
+  {n:"品丽珠", pair:"配蒜香黄油", t:"15–17℃", r:1},
+  {n:"过桶霞多丽", pair:"伯那西／荷兰酱（黄油呼应黄油）", t:"10–12℃", r:0},
+  {n:"长相思", pair:"青酱 Chimichurri（草本对草本）", t:"8–10℃", r:0},
+  {n:"干型雷司令", pair:"亚洲风味／柚子醋（高酸解辣）", t:"8–10℃", r:0},
+  {n:"香槟", pair:"生牛肉塔塔、开胃（气泡切油脂）", t:"6–8℃", r:0},
+  {n:"波特", pair:"蓝芝士汁（经典甜咸配）", t:"16–18℃", r:0}
+];
+/* §09 十二款酱汁 + 部位首选 */
+var SAUCE12 = [
+  {n:"黑胡椒汁", pair:"配黑胡椒汁 → 西拉", use:"Medium – Well Done"},
+  {n:"红酒汁", pair:"菲力 · 黑皮诺", use:"Rare – Medium"},
+  {n:"蘑菇汁", pair:"菲力备选", use:"Medium Rare – Medium"},
+  {n:"伯那西", pair:"菲力首选 · 梅洛", use:"Rare – Medium Rare"},
+  {n:"荷兰酱", pair:"过桶霞多丽", use:"Rare – Medium Rare"},
+  {n:"蓝芝士汁", pair:"波特", use:"Medium – Medium Well"},
+  {n:"青酱", pair:"眼肉首选 · 长相思", use:"Rare – Medium"},
+  {n:"蒜香黄油", pair:"品丽珠", use:"全部"},
+  {n:"辣根奶油", pair:"烤牛肉传统", use:"Rare – Medium Rare"},
+  {n:"松露汁", pair:"宜少量", use:"Medium"},
+  {n:"法式胡椒汁", pair:"T 骨备选", use:"Medium – Medium Well"},
+  {n:"照烧／柚子醋", pair:"和牛 · 干型雷司令", use:"Rare – Medium"}
+];
+/* 部位 → 首选酱汁（§09 表二） */
+var CUT2SAUCE = [
+  {cut:"菲力", sauce:"伯那西"},
+  {cut:"西冷", sauce:"黑胡椒汁"},
+  {cut:"眼肉", sauce:"青酱"},
+  {cut:"T 骨", sauce:"黑胡椒汁"},
+  {cut:"干式熟成", sauce:"肉汁＋海盐"},
+  {cut:"和牛", sauce:"柚子醋"}
+];
+/* 配酒案例：按 §11 的搭配表构造（部位/酱汁 → 正确那杯） */
+var WINE_CASES = [
+  {d:"眼肉 · 黑胡椒汁", right:"赤霞珠", why:"脂肪足 → 单宁强，压得住油脂"},
+  {d:"菲力 · 伯那西汁", right:"梅洛", why:"最瘦的部位 → 单宁要细"},
+  {d:"菲力 · 红酒汁", right:"黑皮诺", why:"轻酒体、高酸，配红酒汁"},
+  {d:"西冷 · 黑胡椒汁", right:"西拉", why:"黑胡椒对黑胡椒，同香呼应"},
+  {d:"干式熟成 · 海盐", right:"丹魄", why:"皮革烟草 → 风味同源"},
+  {d:"眼肉 · 青酱", right:"长相思", why:"草本对草本"},
+  {d:"西冷 · 蓝芝士汁", right:"波特", why:"甜咸配，经典"},
+  {d:"全熟 · BBQ", right:"仙粉黛", why:"果酱感补回汁水"},
+  {d:"菲力 · 蒜香黄油", right:"品丽珠", why:"草本配黄油"},
+  {d:"T 骨 · 意式", right:"桑娇维塞", why:"高酸配 T 骨"}
+];
+var WINE_POOL = ["赤霞珠","西拉","梅洛","黑皮诺","马尔贝克","丹魄","仙粉黛","品丽珠","桑娇维塞","长相思","波特","过桶霞多丽"];
+/* 挑 3 个干扰项（确定性，不随机） */
+function wineOptions(ci){
+  var right = WINE_CASES[ci].right, out = [right], p = WINE_POOL.indexOf(right);
+  for(var k = 1; out.length < 4; k++){
+    var cand = WINE_POOL[(p + k*3 + ci) % WINE_POOL.length];
+    if(out.indexOf(cand) < 0) out.push(cand);
+  }
+  /* 固定顺序：正确项的位置由案例号决定 */
+  var rot = ci % 4;
+  for(var j = 0; j < rot; j++) out.push(out.shift());
+  return out;
+}
+/* 熟度答题选项（5 档英文） */
+var EN5 = ["Rare","Medium Rare","Medium","Medium Well","Well Done"];
+function donOptions(ci){
+  var right = SAY2EN[ci].en, out = [right], i = 0;
+  for(var k = 1; out.length < EN5.length; k++){
+    var cand = EN5[(EN5.indexOf(right) + k*2 + ci) % EN5.length];
+    if(out.indexOf(cand) < 0){ out.push(cand); i++; }
+  }
+  var rot = ci % out.length;
+  for(var j = 0; j < rot; j++) out.push(out.shift());
+  return out;
+}
+
+var ROLES = {};
+/* ================= role_chef.js ================= */
+/* ==================================================================
+   ① 厨师 · 火候窗 —— 两个轴互相拆台
+   轴 A 核心温度：落进客人点的带（出锅后还有 +2.5℃ 惯性）
+   轴 B 焦壳：只有大火才长 —— ≥60 合格 · ≥100 碳化报废
+   数据来自指南 §02 八档中心温度 / §04 单面时间 / §05 静置与回温
+   ================================================================== */
+ROLES.chef = {
+  id: "chef", name: "① 厨师", name2: "厨师", key: "中火到出锅那 3 秒，决定这块肉",
+  ac: "#f0801f", scoreLabel: "火候分（完美块数 × 15）", padMain: "出锅 ⏺",
+  emoji: "🔥",
+  hud: {
+    m1: { lbl: "核心温度", sub: "出锅窗 → +2.5℃ 惯性", zones: [[0, 54.5, "dry"], [54.5, 59.5, "ok"], [59.5, 100, "risk"]], marks: [52.0, 57.0] },
+    m2: { lbl: "焦壳", sub: "合格 60–99", zones: [[0, 60, "dry"], [60, 100, "ok"]], marks: [60] }
+  },
+  tip: "◀ ▶ 拨火力 · ⏺ 出锅（先算上出锅后还会涨 2.5℃）",
+  rules: [
+    "<b>◀ ▶</b> 拨火力：火大推两个轴 —— 核心升得快，焦壳才长得起来",
+    "<b>⏺ 出锅</b>：不是翻面。出锅后中心还会再涨 <b>+2.5℃</b>，所以要在<b>出锅窗</b>里端走",
+    "焦壳 <b>≥60 合格</b>（灰白 = 没上色，只能算及格）、<b>≥100 碳化</b> —— 直接报废",
+    "客人点单会换（三分熟 57℃ / 五分熟 63℃ / 七分熟 66℃）：带越高，火就得越收"
+  ],
+  /* ---------------- 初始化 ---------------- */
+  init: function(S){
+    S.ordSeq = [2, 3, 2, 4, 2, 3, 2, 3, 2, 4];
+    S.oi = 0;
+    S.ord = DON8[S.ordSeq[0]];
+    S.core = 20; S.crust = 0; S.pan = 20; S.flame = 0;
+    S.carbon = false;
+    S.pass = []; S.log = [];
+    S.n = { perfect: 0, ok: 0, bad: 0, sumCore: 0, sumCrust: 0, cnt: 0, over: 0 };
+    S.m1 = S.core; S.m2 = S.crust; S.m1t = "20.0℃"; S.m2t = "0";
+    S.comboTxt = "客人点：" + S.ord.zh + " " + S.ord.en;
+    say("start", "", "三分熟 57℃ ±2.5 —— 出锅前得落在 52–57℃", 9000);
+  },
+  /* ---------------- 每帧 ---------------- */
+  update: function(S, dt){
+    /* 拨火 */
+    if(HOLD.left) S.flame = Math.max(0, S.flame - 78*dt);
+    if(HOLD.right) S.flame = Math.min(100, S.flame + 78*dt);
+    /* 锅温追火（有惯性，像真锅） */
+    S.pan += (S.flame - S.pan) * Math.min(1, dt*3.4);
+    if(S.pan < 0) S.pan = 0;
+    /* 核心温度：慢（热容大） */
+    var rc = S.pan*0.062 - 1.15;
+    S.core += rc*dt;
+    if(S.core < 15) S.core = 15;
+    if(S.core > 96) S.core = 96;
+    /* 焦壳：只有锅面够热才长 */
+    S.crust += Math.max(0, S.pan - 50)*0.30*dt;
+    S.m1 = S.core; S.m1t = (Math.round(S.core*10)/10) + "℃";
+    S.m2 = Math.min(100, S.crust); S.m2t = String(Math.round(S.crust));
+    /* 碳化：焦壳到顶就废 */
+    if(S.crust >= 100 && !S.carbon){
+      S.carbon = true;
+      sfx("sad"); S.shake = 1.1;
+      burst(470, 400, "#2a221d", 26, 220);
+      judge(S, { core: S.core, crust: 100, carbon: 1 });
+      S.crust = 0; S.core = 20; S.carbon = false;
+      say("carbon", "warn", "焦壳到 100 —— 碳化了，这一块报废", 3000);
+    }
+    /* 静置台：出锅后的惯性 +2.5℃ / 2 秒 */
+    for(var i = S.pass.length - 1; i >= 0; i--){
+      var p = S.pass[i];
+      if(p.resolved) continue;
+      p.t += dt;
+      p.core += 1.25*dt;                     /* 出锅后还在涨 */
+      if(p.t >= 2){
+        p.resolved = true;
+        judge(S, p);
+      }
+    }
+    /* 静置台只留最近 4 盘 */
+    while(S.pass.length > 4) S.pass.shift();
+  },
+  /* ---------------- 输入 ---------------- */
+  act: function(S, a){
+    if(a !== "main") return;
+    if(S.core < 22){ say("early", "warn", "还没热呢 —— 这是块生肉", 2500); return; }
+    S.pass.push({ core: S.core, crust: S.crust, t: 0, dish: S.ord, resolved: false, flash: 1 });
+    S.n.sumCore += S.core; S.n.sumCrust += S.crust; S.n.cnt++;
+    sfx("flip"); burst(470, 400, "#ffb45c", 10, 150);
+    floatTxt(470, 350, "出锅 " + (Math.round(S.core*10)/10) + "℃", "#ffd88a", 16);
+    /* 下一块 */
+    S.core = 20; S.crust = 0;
+    S.oi = (S.oi + 1) % S.ordSeq.length;
+    S.ord = DON8[S.ordSeq[S.oi]];
+    S.comboTxt = "客人点：" + S.ord.zh + " " + S.ord.en;
+    applyHudZones(S);
+  },
+  /* 机器人：把「几档火」当成优化问题解 —— 用真公式小步预演，
+     目标 = 在「壳不超标」的前提下最快把核心推到出锅点（比分只认 完美/及格，壳只当约束） */
+  bot: function(S, dt){
+    var pT = S.ord.t - 2.5, best = null;
+    for(var F = 60; F <= 100; F += 5){
+      var pan = S.pan, core = S.core, crust = S.crust, T = 0, h = 0.1, over = false;
+      while(T < 30){
+        pan += (F - pan) * Math.min(1, h*3.4);
+        if(pan < 0) pan = 0;
+        core += (pan*0.062 - 1.15) * h;
+        crust += Math.max(0, pan - 50) * 0.30 * h;
+        T += h;
+        if(core >= pT) break;
+        if(crust >= 93){ over = true; break; }      /* 这档火等不到出锅就废 */
+      }
+      if(over) continue;
+      if(crust < 62) continue;                      /* 壳太薄只能及格，不划算 */
+      if(!best || T < best.T) best = { F: F, T: T };
+    }
+    S.flame = best ? best.F : 92;
+    if(S.core >= pT) this.act(S, "main");
+  },
+  /* ---------------- 判分 ---------------- */
+  /* 每块 18 分：60 秒里 6 块全完美 = 108 → 封顶 100（这是机器人实测跑得出来的天花板） */
+  score: function(S){ return S.n.perfect*18 + S.n.ok*8; },
+  title: function(S, sc){
+    if(sc >= 100) return "焦壳是一条线的钟表匠";
+    if(sc >= 86) return "后厨里最稳的那口锅";
+    if(sc >= 54) return "火候还行，焦壳不对";
+    if(sc >= 28) return "锅是热的，手是凉的";
+    return "碳化屠夫";
+  },
+  stats: function(S, sc){
+    var avg = S.n.cnt ? Math.round(S.n.sumCore/S.n.cnt*10)/10 : 0;
+    var avgk = S.n.cnt ? Math.round(S.n.sumCrust/S.n.cnt) : 0;
+    return [
+      [S.n.perfect + " 块", "完美"],
+      [S.n.ok + " 块", "及格"],
+      [S.n.bad + " 块", "报废"],
+      [avg + "℃", "平均出锅温度"],
+      [avgk + "", "平均焦壳"]
+    ];
+  },
+  cf: function(S, sc){
+    var avg = S.n.cnt ? Math.round(S.n.sumCore/S.n.cnt*10)/10 : 0;
+    if(sc >= 100) return "反事实：同一块肉，你只要在 52℃ 就端走、火再收半档，就是满盘完美 —— 今天全做到了。";
+    if(S.n.bad > 2) return "反事实：把火降两档、早 3 秒出锅，" + S.n.bad + " 块报废里至少 3 块能救回来。焦壳是一条线，过了就是碳。";
+    return "反事实：平均出锅 " + avg + "℃ —— 只要每块都落在出锅窗里，这局还能再高 " + Math.max(6, 100 - sc) + " 分。";
+  },
+  share: function(S, sc, title){
+    return "我在《我要吃牛排》当厨师拿了 " + sc + " 分 · " + title + "。" +
+      S.n.perfect + " 块完美 / " + S.n.bad + " 块报废，平均出锅 " +
+      (S.n.cnt ? Math.round(S.n.sumCore/S.n.cnt*10)/10 : 0) + "℃。你敢不敢来掌一次勺？";
+  }
+};
+/* 换订单时把 HUD 的带跟着挪（绿区 = 客人要的带，刻度 = 你的出锅窗） */
+function applyHudZones(S){
+  var t = S.ord.t, lo = t - 2.5, hi = t + 2.5;
+  ROLES.chef.hud.m1.zones = [[0, lo, "dry"], [lo, hi, "ok"], [hi, 100, "risk"]];
+  ROLES.chef.hud.m1.marks = [t - 5, t];
+  ROLES.chef.hud.m1.sub = "出锅窗 " + (t - 5) + "–" + t + "℃ → +2.5 惯性";
+  applyHud(ROLES.chef);
+}
+/* 一块牛排的判定 */
+function judge(S, p){
+  var t = p.dish.t, lo = t - 2.5, hi = t + 2.5;
+  var inBand = p.core >= lo && p.core <= hi;
+  var kOK = p.crust >= 60 && p.crust < 100;
+  var kind, col, pop;
+  if(p.carbon || p.crust >= 100){ kind = "bad"; col = "#7d6c60"; pop = "碳 · 报废"; }
+  else if(p.core > hi + 3){ kind = "bad"; col = "#8a7364"; pop = "过熟 " + (Math.round(p.core*10)/10) + "℃"; }
+  else if(p.core < lo - 3){ kind = "bad"; col = "#a8232c"; pop = "太生 " + (Math.round(p.core*10)/10) + "℃"; }
+  else if(inBand && kOK){ kind = "perfect"; col = "#ffd45e"; pop = "完美 " + (Math.round(p.core*10)/10) + "℃"; }
+  else if(inBand){ kind = "ok"; col = "#cbbfb4"; pop = "偏白 · 焦壳 " + Math.round(p.crust); }
+  else { kind = "ok"; col = "#cbbfb4"; pop = "偏一档 " + (Math.round(p.core*10)/10) + "℃"; }
+  S.n[kind]++;
+  S.log.push(kind);
+  p.kind = kind;
+  if(kind === "perfect"){
+    sfx("bell"); burst(470, 400, "#ffd45e", 20, 190);
+    floatTxt(470, 340, "+15  " + pop, "#ffd45e", 20);
+    S.shake = 0.5;
+  } else if(kind === "ok"){
+    sfx("hot"); burst(470, 400, "#cbbfb4", 10, 120);
+    floatTxt(470, 340, "+6  " + pop, "#e6d8c8", 17);
+  } else {
+    sfx("wrong"); burst(470, 400, "#8a7364", 14, 140);
+    floatTxt(470, 340, "0  " + pop, "#e08a8a", 18);
+  }
+}
+/* ================= role_chef_draw.js ================= */
+/* ==================================================================
+   ① 厨师 —— 画面：不锈钢后厨 · 铁锅 · 火焰 · 静置台
+   ================================================================== */
+ROLES.chef.bg = function(dt){
+  var g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, "#171310"); g.addColorStop(.55, "#221a14"); g.addColorStop(1, "#2c211a");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  /* 后厨墙砖 */
+  ctx.strokeStyle = "rgba(255,255,255,.045)"; ctx.lineWidth = 1;
+  for(var y = 0; y < H; y += 46){ ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+  for(var x = 0; x < W; x += 92){
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+  /* 抽油烟机 */
+  ctx.fillStyle = "rgba(0,0,0,.42)"; ctx.fillRect(0, 0, W, 96);
+  ctx.fillStyle = "rgba(190,200,210,.10)"; ctx.fillRect(320, 74, 320, 12);
+  /* 灶台面 */
+  ctx.fillStyle = "rgba(0,0,0,.34)"; ctx.fillRect(0, 300, W, 300);
+  ctx.fillStyle = "rgba(150,160,168,.10)"; ctx.fillRect(0, 300, W, 6);
+  /* 炉火温暖的光晕（跟着火力走） */
+  if(S){
+    var k = S.flame/100, gl = ctx.createRadialGradient(440, 470, 10, 440, 470, 200 + k*130);
+    gl.addColorStop(0, "rgba(255,150,50," + (0.10 + k*0.30) + ")");
+    gl.addColorStop(1, "rgba(255,120,40,0)");
+    ctx.fillStyle = gl; ctx.fillRect(180, 230, 560, 370);
+  }
+};
+ROLES.chef.draw = function(S, dt){
+  var t = S.ord, lo = t.t - 2.5, hi = t.t + 2.5, pLo = t.t - 5;
+  var tt = performance.now()/1000;
+  /* ---- 客人点单卡 ---- */
+  box(268, 76, 424, 74, 14, "rgba(245,238,228,.95)", "rgba(0,0,0,.35)", 2);
+  pt("客人点：", 288, 108, 17, "#6b5b4e", "left", 700);
+  pt(t.zh + " " + t.en, 372, 111, 26, "#8e2b2c", "left", 900);
+  pt("成品带 " + lo + "–" + hi + "℃　·　出锅窗 " + pLo + "–" + t.t + "℃（还会涨 2.5）", 288, 136, 14, "#7a6a5c", "left", 700);
+  /* ---- 温度柱 ---- */
+  gauge(112, 196, 42, 320, 0, 90, lo, hi, S.core, Math.min(96, S.core + 2.5), S.core > 60);
+  pt("核心", 112, 184, 14, "rgba(255,255,255,.55)", "left", 800);
+  pt("出锅窗", 112 - 6, 540, 13, "rgba(255,196,107,.9)", "left", 700);
+  pt(pLo + "–" + t.t + "℃", 112 + 8, 558, 13, "rgba(255,196,107,.75)", "left", 700);
+  /* ---- 铁锅 ---- */
+  ctx.beginPath(); ctx.ellipse(440, 432, 152, 112, 0, 0, 6.284);
+  ctx.fillStyle = "rgba(0,0,0,.42)"; ctx.fill();
+  var pg = ctx.createRadialGradient(410, 400, 20, 440, 432, 150);
+  pg.addColorStop(0, "#3b3330"); pg.addColorStop(1, "#1d1a18");
+  ctx.beginPath(); ctx.ellipse(440, 428, 146, 106, 0, 0, 6.284); ctx.fillStyle = pg; ctx.fill();
+  ctx.lineWidth = 5; ctx.strokeStyle = "rgba(210,216,222,.30)"; ctx.stroke();
+  /* 锅里的油光 */
+  ctx.globalAlpha = .10 + S.flame/500;
+  ctx.beginPath(); ctx.ellipse(452, 418, 120, 84, 0, 0, 6.284);
+  ctx.fillStyle = "#ffd9a0"; ctx.fill(); ctx.globalAlpha = 1;
+  /* 牛排 */
+  var jig = Math.min(1, S.flame/100)*1.4;
+  steakShape(440 + Math.sin(tt*11)*jig, 424 + Math.cos(tt*9)*jig*0.6, 98, 70, S.crust, S.core, Math.sin(tt*1.7)*0.05);
+  /* 火焰 */
+  flame(316, 516, 248, 96, tt, S.flame/100);
+  pt("火力 " + Math.round(S.flame), 440, 570, 17, S.flame > 60 ? "#ffb45c" : "#d9cbbb", "center", 800);
+  /* ---- 火力滑杆 ---- */
+  var sx = 704, sy = 214, sh = 250;
+  box(sx, sy, 40, sh, 18, "rgba(14,11,9,.9)", "rgba(255,255,255,.22)", 2);
+  for(var v = 0; v <= 100; v += 20){
+    var yy = sy + sh - v/100*sh;
+    ctx.strokeStyle = "rgba(255,255,255,.25)"; ctx.beginPath();
+    ctx.moveTo(sx + 40, yy); ctx.lineTo(sx + 48, yy); ctx.stroke();
+  }
+  var ky = sy + sh - S.flame/100*sh;
+  box(sx - 4, ky - 9, 48, 18, 9, S.flame > 60 ? "#f0801f" : "#b9a08a", "rgba(0,0,0,.4)", 2);
+  pt("火", sx + 20, sy - 12, 15, "rgba(255,255,255,.6)", "center", 800);
+  /* ---- 静置台 ---- */
+  box(776, 190, 168, 296, 14, "rgba(18,14,12,.72)", "rgba(255,255,255,.14)", 2);
+  pt("静置台", 794, 214, 16, "#e6d8c8", "left", 800);
+  pt("出锅后 +2.5℃/2 秒", 794, 232, 11.5, "rgba(255,196,107,.8)", "left", 700);
+  var shown = S.pass.slice(-4);
+  for(var i = 0; i < 4; i++){
+    var p = shown[i], ry = 250 + i*58;
+    box(792, ry, 138, 50, 10, "rgba(255,255,255,.055)");
+    if(!p){ pt("—", 861, ry + 30, 14, "rgba(255,255,255,.22)", "center", 700); continue; }
+    var age = Math.min(1, p.t/2);
+    steakShape(816, ry + 26, 22, 15, p.crust, p.core, 0);
+    pt(p.dish.zh, 842, ry + 20, 13, "#e6d8c8", "left", 800);
+    pt((Math.round(p.core*10)/10) + "℃", 842, ry + 38, 13, p.kind === "perfect" ? "#ffd45e" : (p.kind === "bad" ? "#e08a8a" : "#cbbfb4"), "left", 800);
+    if(!p.resolved){
+      ctx.beginPath(); ctx.arc(816, ry + 26, 20, -1.57, -1.57 + age*6.284);
+      ctx.strokeStyle = "rgba(255,196,107,.85)"; ctx.lineWidth = 3; ctx.stroke();
+    } else pt(p.kind === "perfect" ? "✓ 完美" : (p.kind === "bad" ? "✗ 报废" : "≈ 及格"), 921, ry + 45, 11.5, "rgba(255,255,255,.5)", "right", 700);
+  }
+  /* ---- 底部战况 ---- */
+  box(60, 588 - 64, 560, 52, 12, "rgba(0,0,0,.34)");
+  var names = [["完美", S.n.perfect, "#ffd45e"], ["及格", S.n.ok, "#cbbfb4"], ["报废", S.n.bad, "#e08a8a"]];
+  for(var k = 0; k < 3; k++){
+    pt(names[k][0], 84 + k*112, 588 - 32, 15, "rgba(255,255,255,.62)", "left", 700);
+    pt("× " + names[k][1], 84 + k*112 + 44, 588 - 30, 22, names[k][2], "left", 900);
+  }
+  pt("已出 " + S.n.cnt + " 块", 480, 588 - 30, 17, "#e6d8c8", "left", 800);
+  /* ---- 订单进度点 ---- */
+  for(var d = 0; d < S.ordSeq.length; d++){
+    var dx = 640 + (d % 5)*20, dy = 588 - 46 + Math.floor(d/5)*18;
+    ctx.beginPath(); ctx.arc(dx, dy, 5, 0, 6.284);
+    ctx.fillStyle = d === S.oi ? "#f0801f" : (d < S.oi ? "rgba(255,212,94,.5)" : "rgba(255,255,255,.22)");
+    ctx.fill();
+  }
+};
+/* ================= role_foh.js ================= */
+/* ==================================================================
+   ② 服务员 · 耐心 × 营业额 —— 一双手，四桌客
+   轴 A：四桌耐心，跌破 25 = 投诉（免单）
+   轴 B：营业额 —— 点单 268 / 配酒 88–128 / 小费看耐心
+   知识：§06 中英熟度误区（客人说中文，你要点对英文档）
+        §11 十五款酒（部位＋酱汁 → 那杯酒）
+   ================================================================== */
+ROLES.foh = {
+  id: "foh", name: "② 服务员", name2: "服务员", key: "三分熟不是 Medium，点错就是退单",
+  ac: "#c9a227", scoreLabel: "营业额分（¥2200 满分 − 投诉×6）", padMain: "⏺ 确认",
+  emoji: "🍷",
+  hud: {
+    m1: { lbl: "最急那桌的耐心", sub: "跌破 25 = 投诉", zones: [[0, 25, "risk"], [25, 100, "ok"]], marks: [25] },
+    m2: { lbl: "营业额", sub: "¥2200 满分", zones: [[0, 73, "dry"], [73, 100, "ok"]], marks: [73] }
+  },
+  tip: "◀ ▶ 走到桌前 · ⏺ 停在你想要的那一档",
+  rules: [
+    "<b>◀ ▶</b> 沿吧台走位：四桌客人，只有一双脚",
+    "走到桌边会自动开始<b>扫档</b>，<b>⏺</b> 停在你想要的那一档 —— 客人说“三分熟”，你要停 <b>Medium Rare</b>",
+    "订了酒的桌：扫<b>酒单</b>，按<b>部位＋酱汁</b>推那杯（指南 §11 十五条铁律）",
+    "厨房做好会响铃，<b>3 秒内</b>端过去；耐心跌破 <b>25</b> 就投诉免单"
+  ],
+  /* ---------------- 初始化 ---------------- */
+  init: function(S){
+    /* 计数器必须先于 newGuest 初始化：newGuest 用 S.done 取部位/熟度组合，
+       未初始化时 S.done === undefined → NaN 下标 → CUT2SAUCE[NaN] 未定义 → 整关 init 崩 */
+    S.wx = 200; S.rev = 0; S.done = 0; S.compl = 0; S.streak = 0; S.best = 0;
+    S.wineN = 0; S.wineOK = 0; S.serveN = 0; S.serveOK = 0;
+    S.tb = [];
+    for(var i = 0; i < 4; i++) S.tb.push(this.newGuest(S, i, 100));
+    S.m1 = 100; S.m1t = "100"; S.m2 = 0; S.m2t = "¥0";
+    S.comboTxt = "四桌客人：一位只有一双手";
+    say("start", "", "走到桌边 → ⏺ 停在客人要的那一档", 9000);
+  },
+  newGuest: function(S, i, pat){
+    var d = (S && S.done) || 0;
+    var cf = (i*3 + d) % CUT2SAUCE.length;
+    var cut = CUT2SAUCE[cf].cut;
+    var wi = ((i*2 + d) % 3 === 0);
+    return {
+      i: i, cut: cut, sauce: CUT2SAUCE[cf].sauce, wine: wi,
+      orderVal: 268, wineVal: wi ? (i % 2 ? 128 : 88) : 0,
+      pat: pat, need: "order", cook: 0, win: 0, done: false,
+      ci: (i*3 + d) % SAY2EN.length,
+      wci: (i*2 + d) % WINE_CASES.length,
+      q: null, flash: 0, late: false
+    };
+  },
+  /* ---------------- 每次走到桌边 / 离开 ---------------- */
+  qStart: function(S, tb){
+    if(tb.need === "order" && !tb.q){
+      var opts = donOptions(tb.ci);
+      tb.q = { kind: "order", opts: opts, right: opts.indexOf(SAY2EN[tb.ci].en), t: 0, step: 1.02, ask: SAY2EN[tb.ci].say };
+      sfx("click");
+    } else if(tb.need === "wine" && !tb.q){
+      var wo = wineOptions(tb.wci);
+      tb.q = { kind: "wine", opts: wo, right: wo.indexOf(WINE_CASES[tb.wci].right), t: 0, step: 0.92, ask: WINE_CASES[tb.wci].d };
+      sfx("click");
+    }
+  },
+  qIdx: function(q){ return Math.floor(q.t/q.step) % q.opts.length; },
+  qStop: function(S, tb, forced){
+    var q = tb.q; if(!q) return;
+    var hit = forced ? true : (this.qIdx(q) === q.right);
+    if(q.kind === "order"){
+      if(hit){
+        S.rev += tb.orderVal; S.done++; S.streak++; S.best = Math.max(S.best, S.streak);
+        sfx("coin"); tb.flash = 1;
+        floatTxt(tb.x || 200, 300, "+¥" + tb.orderVal, "#ffd45e", 20);
+        tb.need = tb.wine ? "wine" : "cook"; tb.cook = 1.3 + tb.i*0.35;
+        if(!tb.wine) tb.cook = 1.3 + tb.i*0.35;
+      } else {
+        S.streak = 0; sfx("wrong");
+        tb.pat = Math.max(0, tb.pat - 26); tb.late = false; tb.flash = 1;
+        floatTxt(tb.x || 200, 300, "退单！" + q.opts[this.qIdx(q)] + " ≠ " + q.ask, "#e08a8a", 17);
+        say("w" + tb.i, "warn", "点错了 —— “" + SAY2EN[tb.ci].say + "” 是 " + SAY2EN[tb.ci].en, 2600);
+        tb.ci = (tb.ci + 1) % SAY2EN.length;
+      }
+    } else {
+      S.wineN++;
+      if(hit){
+        S.wineOK++; S.rev += tb.wineVal; tb.flash = 1; sfx("coin");
+        floatTxt(tb.x || 200, 300, "+¥" + tb.wineVal + " " + WINE_CASES[tb.wci].right, "#ffd45e", 19);
+        say("w" + tb.i, "good", tb.cut + " 配 " + WINE_CASES[tb.wci].right + "：" + WINE_CASES[tb.wci].why, 2600);
+      } else {
+        sfx("wrong"); tb.pat = Math.max(0, tb.pat - 12);
+        floatTxt(tb.x || 200, 300, "配错了 · 客人没喝", "#e08a8a", 17);
+        say("w" + tb.i, "warn", "这桌要的是 " + WINE_CASES[tb.wci].right + "：" + WINE_CASES[tb.wci].why, 2600);
+        tb.wci = (tb.wci + 1) % WINE_CASES.length;
+      }
+      tb.need = "cook"; tb.cook = 1.3 + tb.i*0.35;
+    }
+    tb.q = null;
+  },
+  /* ---------------- 每帧 ---------------- */
+  update: function(S, dt){
+    /* 走位 */
+    var mv = 0;
+    if(HOLD.left) mv = -1; if(HOLD.right) mv = 1;
+    if(BOT && S.botMv != null) mv = S.botMv;
+    S.wx = Math.max(140, Math.min(860, S.wx + mv*250*dt));
+    var at = this.atTable(S);
+    /* 四桌推进 */
+    for(var i = 0; i < 4; i++){
+      var tb = S.tb[i];
+      tb.flash = Math.max(0, tb.flash - dt*2.6);
+      if(tb.need === "cook"){
+        tb.pat -= 5*dt; tb.cook -= dt;
+        if(tb.cook <= 0){ tb.need = "serve"; tb.win = 3.0; sfx("bell"); say("bell" + i, "good", "第 " + (i+1) + " 桌的菜好了 —— 3 秒内端上去", 2400); }
+      } else if(tb.need === "serve"){
+        tb.pat -= 6*dt; tb.win -= dt;
+        if(tb.win <= 0){ tb.need = "eat"; tb.late = true; tb.pat = Math.max(0, tb.pat - 14); sfx("sad"); floatTxt(tb.x || 200, 300, "凉了", "#e08a8a", 18); }
+      } else if(tb.need === "eat"){
+        tb.pat -= 2*dt; tb.cook -= dt;
+        if(tb.cook <= 0) tb.need = "bill";
+      } else if(tb.need === "bill"){
+        tb.pat -= 6*dt;
+      } else { /* order / wine */
+        tb.pat -= 7*dt;
+      }
+      if(tb.pat <= 0){
+        S.compl++; tb.pat = 72; sfx("sad"); S.shake = 1;
+        floatTxt(tb.x || 200, 300, "投诉！免单", "#e08a8a", 19);
+        say("c" + i, "warn", "第 " + (i+1) + " 桌投诉了 —— 这单免了", 2600);
+        S.tb[i] = this.newGuest(S, i, 72);
+      }
+      if(tb.need === "order" || tb.need === "wine"){
+        if(at === i){ this.qStart(S, tb); if(tb.q) tb.q.t += dt; }
+      }
+    }
+    /* 已完成的桌：结账后换新客（由 act 处理） */
+    var minPat = 100;
+    for(var j = 0; j < 4; j++) minPat = Math.min(minPat, S.tb[j].pat);
+    S.m1 = minPat; S.m1t = String(Math.round(minPat));
+    S.m2 = Math.min(100, S.rev/22); S.m2t = "¥" + S.rev;
+    S.comboTxt = "连对 × " + S.streak + "　·　完单 " + S.done + "　·　投诉 " + S.compl;
+    /* 按需更新 ⏺ 标签 */
+    var lbl = "⏺ 确认";
+    if(at >= 0){
+      var cur = S.tb[at];
+      if(cur.q) lbl = "⏺ 停";
+      else if(cur.need === "serve") lbl = "⏺ 上菜";
+      else if(cur.need === "bill") lbl = "⏺ 结账";
+      else if(cur.need === "cook") lbl = "… 等厨房";
+      else if(cur.need === "eat") lbl = "… 客人在吃";
+    }
+    var pm = document.getElementById("padMain");
+    if(pm && pm.textContent !== lbl) pm.textContent = lbl;
+    /* 给画布用的坐标 */
+    for(var k = 0; k < 4; k++) S.tb[k].x = 200 + k*200;
+  },
+  atTable: function(S){
+    var best = -1, bd = 78;
+    for(var i = 0; i < 4; i++){
+      var d = Math.abs(S.wx - (200 + i*200));
+      if(d < bd){ bd = d; best = i; }
+    }
+    return best;
+  },
+  /* ---------------- 输入 ---------------- */
+  act: function(S, a){
+    if(a !== "main") return;
+    var i = this.atTable(S);
+    if(i < 0){ say("noone", "warn", "先走到一张桌子旁边", 2200); return; }
+    var tb = S.tb[i];
+    if(tb.q){ this.qStop(S, tb, false); return; }
+    if(tb.need === "serve"){
+      S.serveN++;
+      if(!tb.late && tb.win > 0){
+        var tip = tb.pat >= 70 ? 60 : (tb.pat >= 40 ? 30 : 10);
+        S.rev += tip; S.serveOK++; tb.pat = Math.min(100, tb.pat + 8); tb.flash = 1;
+        sfx("hot"); floatTxt(tb.x, 300, "上菜 +¥" + tip, "#ffd45e", 18);
+      } else {
+        floatTxt(tb.x, 300, "端上去了，但客人已经凉了", "#cbbfb4", 15);
+      }
+      tb.need = "eat"; tb.cook = 2.4; return;
+    }
+    if(tb.need === "bill"){
+      var tip2 = tb.pat >= 70 ? 60 : (tb.pat >= 40 ? 30 : 10);
+      S.rev += tip2; tb.flash = 1; sfx("coin");
+      floatTxt(tb.x, 300, "结账 +¥" + tip2 + " · 翻台", "#ffd45e", 18);
+      say("turn" + i, "good", "翻台 —— 第 " + (i+1) + " 桌换了新客人", 2000);
+      S.tb[i] = this.newGuest(S, i, 100);
+      return;
+    }
+    if(tb.need === "cook"){ say("wait" + i, "", "厨房还在做，端早了", 1800); return; }
+    if(tb.need === "eat"){ say("eating" + i, "", "客人在吃，别催", 1800); return; }
+  },
+  /* 机器人：找最急的、能动手的那桌，走过去并答对 */
+  bot: function(S, dt){
+    var tgt = -1, worst = 999;
+    for(var i = 0; i < 4; i++){
+      var tb = S.tb[i];
+      var actionable = (tb.need === "order" || tb.need === "wine" || tb.need === "serve" || tb.need === "bill");
+      if(!actionable) continue;
+      if(tb.pat < worst){ worst = tb.pat; tgt = i; }
+    }
+    if(tgt < 0){ S.botMv = 0; return; }
+    var want = 200 + tgt*200, d = want - S.wx;
+    S.botMv = Math.abs(d) < 6 ? 0 : (d > 0 ? 1 : -1);
+    if(Math.abs(d) < 60){
+      var tb = S.tb[tgt];
+      if(tb.q) this.qStop(S, tb, true);
+      else if(tb.need === "serve" && tb.win > 0.2) this.act(S, "main");
+      else if(tb.need === "bill") this.act(S, "main");
+    }
+  },
+  /* ---------------- 判分 ---------------- */
+  score: function(S){ return Math.max(0, S.rev/22 - S.compl*6); },
+  title: function(S, sc){
+    if(sc >= 100 && S.compl === 0) return "翻台之神 · 零投诉";
+    if(sc >= 100) return "营业额第一，投诉也第一";
+    if(sc >= 78) return "零投诉的节奏感";
+    if(sc >= 52) return "合格的前厅";
+    if(sc >= 26) return "手忙脚乱的一双手";
+    return "投诉收割机";
+  },
+  stats: function(S, sc){
+    return [
+      ["¥" + S.rev, "营业额"],
+      [S.done + " 单", "完单"],
+      [S.compl + " 次", "投诉"],
+      [S.wineN ? Math.round(S.wineOK/S.wineN*100) + "%" : "—", "配酒正确率"],
+      ["×" + S.best, "最长连对"]
+    ];
+  },
+  cf: function(S, sc){
+    if(S.compl > 0) return "反事实：" + S.compl + " 次投诉全是耐心掉的 —— 每桌先答应一声（按对档），耐心就不掉那么快。";
+    if(S.wineN && S.wineOK < S.wineN) return "反事实：配错的 " + (S.wineN - S.wineOK) + " 杯按“部位优先、酱汁其次”推回来，还能多 " + ((S.wineN - S.wineOK)*128) + " 块。";
+    return "反事实：¥" + S.rev + " —— 完单 " + S.done + "，把上菜窗口再早半秒，还能多翻一桌。";
+  },
+  share: function(S, sc, title){
+    return "我在《我要吃牛排》当前厅拿了 " + sc + " 分 · " + title + "。营业额 ¥" + S.rev +
+      "，完单 " + S.done + "，投诉 " + S.compl + " 次，配酒对了 " + S.wineOK + "/" + S.wineN +
+      " 杯。四桌客、一双手，你来试试？";
+  }
+};
+/* ================= role_foh_draw.js ================= */
+/* ==================================================================
+   ② 服务员 —— 画面：暖木吧台 · 四桌客 · 酒墙 · 点单条
+   ================================================================== */
+ROLES.foh.bg = function(dt){
+  var g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, "#2b1d16"); g.addColorStop(.5, "#3a271c"); g.addColorStop(1, "#25190f");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  /* 木纹 */
+  ctx.strokeStyle = "rgba(0,0,0,.16)"; ctx.lineWidth = 2;
+  for(var y = 20; y < H; y += 26){
+    ctx.beginPath(); ctx.moveTo(0, y);
+    ctx.bezierCurveTo(W*0.3, y + 5, W*0.7, y - 5, W, y + 3); ctx.stroke();
+  }
+  /* 酒墙 */
+  ctx.fillStyle = "rgba(20,12,8,.55)"; ctx.fillRect(0, 40, W, 96);
+  var tt = performance.now()/1000;
+  for(var i = 0; i < 22; i++){
+    var bx = 26 + i*43, hue = (i*47) % 360;
+    ctx.fillStyle = "hsl(" + (hue > 200 ? 350 : 20 + hue/6) + ",42%," + (22 + (i % 4)*3) + "%)";
+    ctx.fillRect(bx, 58 + (i % 3)*4, 13, 62);
+    ctx.fillStyle = "rgba(255,240,210,.22)"; ctx.fillRect(bx + 3, 60 + (i % 3)*4, 3, 40);
+    ctx.fillStyle = "rgba(0,0,0,.6)"; ctx.fillRect(bx + 3, 54 + (i % 3)*4, 7, 8);
+  }
+  /* 吊灯 */
+  for(var k = 0; k < 4; k++){
+    var lx = 200 + k*200;
+    ctx.strokeStyle = "rgba(0,0,0,.55)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(lx, 0); ctx.lineTo(lx, 106); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(lx - 26, 140); ctx.lineTo(lx, 106); ctx.lineTo(lx + 26, 140);
+    ctx.closePath(); ctx.fillStyle = "rgba(30,20,12,.9)"; ctx.fill();
+    ctx.beginPath(); ctx.arc(lx, 146, 11, 0, 6.284);
+    ctx.fillStyle = "rgba(255,214,140," + (0.72 + Math.sin(tt*1.6 + k)*0.06) + ")"; ctx.fill();
+    var gl = ctx.createRadialGradient(lx, 150, 4, lx, 150, 110);
+    gl.addColorStop(0, "rgba(255,206,130,.15)"); gl.addColorStop(1, "rgba(255,206,130,0)");
+    ctx.fillStyle = gl; ctx.fillRect(lx - 110, 60, 220, 220);
+  }
+  /* 地板 */
+  ctx.fillStyle = "rgba(0,0,0,.3)"; ctx.fillRect(0, 470, W, H - 470);
+};
+ROLES.foh.draw = function(S, dt){
+  var tt = performance.now()/1000;
+  var at = this.atTable(S);
+  /* ---- 黑板菜单 ---- */
+  box(40, 158, 300, 86, 10, "rgba(24,30,24,.92)", "rgba(220,205,170,.35)", 2);
+  pt("西冷牛排 ¥268　·　配酒 ¥88／128", 58, 190, 15, "#e8dcc0", "left", 800);
+  pt("点单 268　上菜小费 10–60　结账小费 10–60", 58, 212, 12.5, "rgba(232,220,192,.7)", "left", 700);
+  pt("耐心跌破 25 → 投诉 · 免单", 58, 232, 12.5, "#e0a0a0", "left", 700);
+  /* ---- 吧台 ---- */
+  ctx.fillStyle = "#4a3career"; ctx.fillStyle = "#4a3220";
+  ctx.beginPath(); ctx.roundRect ? ctx.roundRect(30, 392, 900, 44, 10) : ctx.rect(30, 392, 900, 44); ctx.fill();
+  ctx.fillStyle = "rgba(255,220,170,.12)"; ctx.fillRect(30, 392, 900, 7);
+  ctx.fillStyle = "rgba(0,0,0,.35)"; ctx.fillRect(30, 432, 900, 10);
+  /* ---- 四桌客 ---- */
+  for(var i = 0; i < 4; i++){
+    var tb = S.tb[i], x = 200 + i*200;
+    var here = at === i;
+    /* 客人 */
+    ctx.beginPath(); ctx.arc(x, 306, 25, 0, 6.284);
+    ctx.fillStyle = tb.flash > 0 ? "#ffd9a0" : "#c98f6a"; ctx.fill();
+    ctx.beginPath(); ctx.arc(x, 306, 25, 0, 6.284);
+    ctx.strokeStyle = "rgba(0,0,0,.35)"; ctx.lineWidth = 2; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x - 32, 392); ctx.quadraticCurveTo(x, 330, x + 32, 392);
+    ctx.fillStyle = tb.flash > 0 ? "#4a6b8a" : "#38506b"; ctx.fill();
+    /* 耐心环 */
+    var pk = Math.max(0, Math.min(1, tb.pat/100));
+    ctx.beginPath(); ctx.arc(x, 306, 35, -1.57, -1.57 + pk*6.284);
+    ctx.strokeStyle = tb.pat < 25 ? ("rgba(224,85,85," + (0.6 + 0.4*Math.sin(tt*9)) + ")") :
+      (tb.pat > 60 ? "#7fc47f" : (tb.pat > 40 ? "#e0c060" : "#e09040"));
+    ctx.lineWidth = 6; ctx.lineCap = "round"; ctx.stroke();
+    pt("第 " + (i+1) + " 桌", x, 380 - 0, 13, "rgba(255,255,255,.5)", "center", 700);
+    /* 对话气泡 */
+    var bw = 172, bx = x - bw/2, by = 196;
+    var txt1 = "", txt2 = "", col = "#f0e4d0";
+    if(tb.need === "order"){ txt1 = "点单：" + SAY2EN[tb.ci].say; txt2 = "¥268"; col = "#ffd9a0"; }
+    else if(tb.need === "wine"){ txt1 = tb.cut + " · " + tb.sauce; txt2 = "配杯酒 ¥" + tb.wineVal; col = "#e8c86a"; }
+    else if(tb.need === "cook"){ txt1 = "厨房在做…"; txt2 = Math.max(0, tb.cook).toFixed(1) + "s"; col = "#d8d0c0"; }
+    else if(tb.need === "serve"){ txt1 = "菜好了！"; txt2 = "3 秒内端来"; col = tb.win > 1 ? "#9fe08a" : "#e09040"; }
+    else if(tb.need === "eat"){ txt1 = "嗯～ 好吃"; txt2 = Math.round(tb.pat) + "%"; col = "#c8d8c0"; }
+    else { txt1 = "买单"; txt2 = "小费看耐心"; col = "#e8d0a0"; }
+    box(bx, by, bw, 62, 12, here ? "rgba(255,246,232,.96)" : "rgba(245,236,222,.90)", "rgba(0,0,0,.35)", 2);
+    ctx.beginPath(); ctx.moveTo(x - 10, by + 62); ctx.lineTo(x, by + 76); ctx.lineTo(x + 10, by + 62);
+    ctx.fillStyle = here ? "rgba(255,246,232,.96)" : "rgba(245,236,222,.90)"; ctx.fill();
+    pt(txt1, x, by + 28, 15.5, "#4a3626", "center", 800);
+    pt(txt2, x, by + 50, 13, col === "#ffd9a0" ? "#8e5a20" : "#6b5b4e", "center", 700);
+    /* 客人说出的中文档 —— 高亮提醒 */
+    if(tb.need === "order" && here){
+      var q = tb.q;
+      if(q){
+        var n = q.opts.length, cw = 138, gap = 12;
+        var tot = n*cw + (n-1)*gap, sx = 480 - tot/2, cy = 508;
+        box(sx - 22, 480, tot + 44, 96, 14, "rgba(18,12,8,.92)", "rgba(255,214,140,.4)", 2);
+        pt("客人说：“" + q.ask + "” —— 停在客人要的那一档", 480, 506, 17, "#ffd9a0", "center", 800);
+        for(var o = 0; o < n; o++){
+          var ox = sx + o*cw, oi = this.qIdx(q), on = o === oi;
+          box(ox, 520, cw, 42, 8, on ? "rgba(255,212,94,.92)" : "rgba(255,255,255,.10)",
+              on ? "rgba(255,255,255,.6)" : "rgba(255,255,255,.2)", 2);
+          pt(q.opts[o], ox + cw/2, 547, 16, on ? "#2a1d10" : "rgba(255,255,255,.72)", "center", 800);
+        }
+      }
+    }
+    if(tb.need === "wine" && here){
+      var q2 = tb.q;
+      if(q2){
+        var n2 = q2.opts.length, cw2 = 172, gap2 = 12;
+        var tot2 = n2*cw2 + (n2-1)*gap2, sx2 = 480 - tot2/2, cy2 = 508;
+        box(sx2 - 22, 480, tot2 + 44, 96, 14, "rgba(18,12,8,.92)", "rgba(200,160,90,.45)", 2);
+        pt(q2.ask + " —— 推那杯对的酒", 480, 506, 16.5, "#e8c86a", "center", 800);
+        for(var o2 = 0; o2 < n2; o2++){
+          var ox2 = sx2 + o2*cw2, oi2 = this.qIdx(q2), on2 = o2 === oi2;
+          box(ox2, 520, cw2, 42, 8, on2 ? "rgba(255,212,94,.92)" : "rgba(255,255,255,.10)",
+              on2 ? "rgba(255,255,255,.6)" : "rgba(255,255,255,.2)", 2);
+          pt(q2.opts[o2], ox2 + cw2/2, 547, 15, on2 ? "#2a1d10" : "rgba(255,255,255,.72)", "center", 800);
+        }
+      }
+    }
+  }
+  /* ---- 服务员（你） ---- */
+  var wx = S.wx;
+  ctx.beginPath(); ctx.ellipse(wx, 496, 30, 9, 0, 0, 6.284);
+  ctx.fillStyle = "rgba(0,0,0,.45)"; ctx.fill();
+  ctx.beginPath(); ctx.moveTo(wx - 15, 492); ctx.quadraticCurveTo(wx, 430, wx + 15, 492);
+  ctx.fillStyle = "#d8cbb8"; ctx.fill();
+  ctx.beginPath(); ctx.moveTo(wx - 11, 490); ctx.lineTo(wx - 8, 456); ctx.lineTo(wx + 8, 456); ctx.lineTo(wx + 11, 490);
+  ctx.fillStyle = "#8e2b2c"; ctx.fill();
+  ctx.beginPath(); ctx.arc(wx, 444, 13, 0, 6.284); ctx.fillStyle = "#c98f6a"; ctx.fill();
+  ctx.beginPath(); ctx.arc(wx, 442, 14, 3.34, 6.14); ctx.fillStyle = "#2b1d16"; ctx.fill();
+  pt("你", wx, 520, 13, "rgba(255,255,255,.6)", "center", 800);
+  if(at >= 0){
+    ctx.beginPath(); ctx.arc(wx, 460, 34 + Math.sin(tt*6)*2, 0, 6.284);
+    ctx.strokeStyle = "rgba(255,212,94,.5)"; ctx.lineWidth = 2; ctx.stroke();
+  }
+};
+/* ================= role_guest.js ================= */
+/* ==================================================================
+   ③ 客人 · 趁热吃 —— 手机先吃，牛排先凉
+   轴 A：入口温度 —— ≥55℃ 才涨分，≤45℃ 白吃
+   轴 B：满足度 —— 带内每口 +3.5，连吃 3 口 ×1.35
+   拆台：拍照 3 秒，牛排凉 3.4℃；酒配错了，那一口又涩又掉分
+   数据来自指南 §02 中心温度 / §11 配酒（15 款 + 4 条铁律）
+   ================================================================== */
+ROLES.guest = {
+  id: "guest", name: "③ 客人", name2: "客人", key: "手机先吃，牛排先凉",
+  ac: "#e07a8a", scoreLabel: "满足度（热着吃才算）", padMain: "⏺ 长按 3 秒拍照",
+  emoji: "🍽️",
+  hud: {
+    m1: { lbl: "入口温度", sub: "≥55 才涨分 · ≤45 白吃", zones: [[0, 45, "dry"], [45, 55, "risk"], [55, 100, "ok"]], marks: [45, 55] },
+    m2: { lbl: "满足度", sub: "满分 100", zones: [[0, 100, "ok"]], marks: [] }
+  },
+  tip: "◀ 切一口吃 · ▶ 抿一口酒 · ⏺ 长按 3 秒拍照",
+  rules: [
+    "<b>◀ 切一口吃</b>：入口 <b>≥55℃</b> 每口 +3.5，<b>≤45℃</b> 白吃 —— 牛排会一直凉下去",
+    "<b>▶ 抿一口酒</b>：配得上 → 味觉重置（掉温变慢、下一口更香）；配不上 → <b>−3</b> 涩，还得花 3 秒换酒",
+    "<b>⏺ 长按 3 秒</b>拍照：当下不动分，结算才看到 —— 拍照这 3 秒，牛排凉 <b>3.4℃</b>",
+    "连吃 3 口热的 → <b>×1.35</b>；凉透了服务员会给你换一盘（62℃）"
+  ],
+  init: function(S){
+    S.pairs = [
+      { w: "赤霞珠", cut: "眼肉", ok: 1, why: "脂肪足 → 单宁强，正好被油脂化开" },
+      { w: "赤霞珠", cut: "菲力", ok: 0, why: "菲力最瘦，单宁没东西依附 —— 指南点名的“最常见的错误”" },
+      { w: "黑皮诺", cut: "菲力", ok: 1, why: "瘦肉配轻酒体，高酸带出肉味" },
+      { w: "西拉", cut: "西冷", ok: 1, why: "黑胡椒汁 ↔ 西拉的同款辛香" }
+    ];
+    S.pi = 0; S.pair = S.pairs[0];
+    S.temp = 62; S.cool0 = 62; S.plateT = 0; S.wedge = 8;
+    S.sum = 0; S.bites = 0; S.hot = 0; S.cold = 0; S.sumT = 0;
+    S.combo = 0; S.maxCombo = 0; S.chew = 0; S.plates = 1;
+    S.botCd = 0; S.botHold = 0; S.botPhDone = 0;
+    S.wine = { reset: 0, debuff: 0, swap: 0, sips: 0, bad: 0 };
+    S.photo = { ph: 0, n: 0, best: 0, last: 0, flash: 0 };
+    S.m1 = S.temp; S.m1t = "62.0℃"; S.m2 = 0; S.m2t = "0";
+    S.comboTxt = "本桌这杯：" + S.pair.w + " · " + S.pair.cut + (S.pair.ok ? "（配得上）" : "（配不上）");
+    var pm = document.getElementById("padMain"); if(pm) pm.textContent = "⏺ 长按 3 秒拍照";
+    say("start", "", "62℃ 上桌 —— 降到 55℃ 还有 9 秒", 9000);
+  },
+  /* ---------------- 每帧 ---------------- */
+  update: function(S, dt){
+    var w = S.wine, p = S.photo;
+    /* 拍照：长按 3 秒 */
+    if(HOLD.main){
+      if(p.ph >= 0){
+        p.ph += dt;
+        if(p.ph >= 3) this.shoot(S);
+      }
+    } else {
+      if(p.ph > 0.2 && p.ph < 3) say("abort", "", "松手了 —— 没拍成（要按满 3 秒）", 2000);
+      p.ph = 0;
+    }
+    /* 降温：拍照时更快 */
+    var rate = 0.78;
+    if(p.ph > 0) rate *= 1.45;
+    if(w.reset > 0) rate *= 0.55;
+    S.temp -= rate*dt;
+    if(S.temp < 25) S.temp = 25;
+    /* 酒的状态 */
+    if(w.reset > 0) w.reset -= dt;
+    if(w.debuff > 0) w.debuff -= dt;
+    if(w.swap > 0){
+      w.swap -= dt;
+      if(w.swap <= 0){
+        S.pair = S.pairs[(S.pi + 1) % S.pairs.length];
+        S.pi = (S.pi + 1) % S.pairs.length;
+        S.comboTxt = "换酒了：" + S.pair.w + " · " + S.pair.cut + (S.pair.ok ? "（配上了）" : "（还是配不上）");
+        say("swap", "good", "换了一杯：" + S.pair.w + " —— " + S.pair.why, 3000);
+      }
+    }
+    /* 咬合的节奏 */
+    if(S.chew > 0) S.chew -= dt;
+    /* 一盘的时间 / 换盘 */
+    S.plateT += dt;
+    if(S.wedge <= 0 || S.temp <= 42 || S.plateT > 26){
+      S.pi = (S.pi + 1) % S.pairs.length;
+      S.pair = S.pairs[S.pi];
+      S.temp = 62; S.plateT = 0; S.wedge = 8; S.plates++;
+      S.combo = 0; S.botPhDone = 0;
+      S.wine.swap = 0;
+      sfx("bell"); burst(480, 380, "#ffd9a0", 14, 130);
+      say("newplate", "good", "新的一盘上来了 62℃ —— 这杯是 " + S.pair.w + " · " + S.pair.cut, 3000);
+      S.comboTxt = "本桌这杯：" + S.pair.w + " · " + S.pair.cut + (S.pair.ok ? "（配得上）" : "（配不上）");
+    }
+    if(p.flash > 0) p.flash -= dt;
+    S.m1 = S.temp; S.m1t = (Math.round(S.temp*10)/10) + "℃";
+    S.m2 = Math.min(100, S.sum); S.m2t = String(Math.round(Math.min(100, S.sum)));
+    var lbl = "◀ 吃　▶ 酒　⏺ 拍";
+    S.comboDots = S.combo;
+  },
+  /* ---------------- 输入 ---------------- */
+  act: function(S, a){
+    if(a === "left") this.bite(S);
+    else if(a === "right") this.sip(S);
+    else if(a === "main") say("hold", "", "拍照要长按 3 秒 —— 松手就白拍了", 2200);
+  },
+  bite: function(S){
+    if(S.chew > 0) return;
+    S.chew = 0.52;
+    var t = S.temp, w = S.wine, gain = 0, kind = "cold";
+    if(t >= 55){ gain = 3.5; kind = "hot"; S.combo++; S.hot++; S.maxCombo = Math.max(S.maxCombo, S.combo); }
+    else if(t >= 45){ gain = 1.5; kind = "warm"; S.combo = 0; }
+    else { gain = 0; kind = "cold"; S.combo = 0; S.cold++; }
+    if(kind === "hot" && S.combo >= 3) gain *= 1.35;
+    if(w.debuff > 0) gain *= 0.5;
+    if(w.reset > 0 && kind === "hot") gain *= 1.3;
+    S.bites++; S.sum += gain; S.sumT += t; S.wedge--;
+    S.parts2 = (S.parts2 || 0) + 1;
+    var col = kind === "hot" ? "#ffd45e" : (kind === "warm" ? "#e6d8c8" : "#9a8b80");
+    floatTxt(480 + (Math.random()*80 - 40), 400 + Math.random()*40,
+      (gain > 0 ? "+" + (Math.round(gain*10)/10) : "白吃"), col, kind === "hot" ? 20 : 17);
+    if(kind === "hot"){
+      sfx("bite");
+      burst(480, 400, "#e8a05c", 6, 90);
+    } else if(kind === "warm"){ sfx("cut"); }
+    else { sfx("sad"); }
+  },
+  sip: function(S){
+    var w = S.wine, p = S.pair;
+    w.sips++;
+    if(p.ok){
+      w.reset = 3; sfx("sip");
+      S.sum += 1;
+      floatTxt(760, 330, "味觉重置 +1", "#c8d8a0", 17);
+      say("sipok", "good", "配得上：" + p.why, 2400);
+    } else {
+      w.bad++; S.sum = Math.max(0, S.sum - 3); w.debuff = 3; w.swap = 3;
+      sfx("wrong"); S.shake = 0.7;
+      floatTxt(760, 330, "又涩又掉分 −3", "#e08a8a", 18);
+      say("sipbad", "warn", "配不上：" + p.why + " —— 换一杯要 3 秒", 3200);
+    }
+  },
+  shoot: function(S){
+    var p = S.photo, t = S.temp;
+    p.n++; p.last = t; p.best = Math.max(p.best, t); p.flash = 1; p.ph = -1;
+    sfx("shutter");
+    floatTxt(760, 300, "咔嚓 " + (Math.round(t*10)/10) + "℃", t >= 58 ? "#ffd45e" : "#cbbfb4", 18);
+    say("photo", t >= 58 ? "good" : "warn",
+      t >= 58 ? "这张照片是热的（" + (Math.round(t*10)/10) + "℃）—— 结算 +12" :
+        "照片里的牛排已经不冒气了（" + (Math.round(t*10)/10) + "℃）",
+      2600);
+  },
+  bot: function(S, dt){
+    if(S.botHold > 0){ S.botHold -= dt; if(S.botHold <= 0) HOLD.main = 0; return; }
+    if(HOLD.main) return;                        /* 正在拍照 */
+    if(!S.botPhDone && S.temp >= 58 && S.plateT < 5){
+      S.botPhDone = 1; HOLD.main = 1; S.botHold = 3.15; return;   /* 每盘抢一张热照片 */
+    }
+    if(S.botCd > 0) S.botCd -= dt;
+    if(S.botCd <= 0){ this.bite(S); S.botCd = 0.56; }
+  },
+  /* ---------------- 判分 ---------------- */
+  score: function(S){ return Math.min(100, Math.round(S.sum)); },
+  title: function(S, sc){
+    if(sc >= 100) return "最后一口还是 62℃";
+    if(sc >= 84) return "趁热吃的人";
+    if(sc >= 60) return "一半热，一半凉";
+    if(sc >= 32) return "手机先吃";
+    return "凉透的牛排";
+  },
+  stats: function(S, sc){
+    var avg = S.bites ? Math.round(S.sumT/S.bites * 10)/10 : 0;
+    return [
+      [avg + "℃", "平均入口温度"],
+      [(S.bites ? Math.round(S.hot/S.bites*100) : 0) + "%", "热着吃（≥55℃）／" + S.bites + " 口"],
+      [S.cold + " 口", "凉着吃的（≤45℃）"],
+      [S.photo.n + " 张", "照片（最热 " + (S.photo.best ? Math.round(S.photo.best*10)/10 + "℃" : "—") + "）"],
+      ["×" + S.maxCombo, "最长连吃"]
+    ];
+  },
+  cf: function(S, sc){
+    if(S.photo.n > 0 && S.photo.best < 58) return "反事实：" + S.photo.n + " 张照片最热的只有 " + Math.round(S.photo.best*10)/10 + "℃ —— 手机拿晚了 3 秒，就是白凉 3.4℃。";
+    if(S.cold > 4) return "反事实：有 " + S.cold + " 口是凉着吃的。第一盘上来那 9 秒，才是这局最贵的 9 秒。";
+    return "反事实：热口 " + S.hot + "/" + S.bites + " —— 把每一口都赶在 55℃ 之前，还能再高 " + Math.max(4, 100 - sc) + " 分。";
+  },
+  share: function(S, sc, title){
+    return "我在《我要吃牛排》当客人拿了 " + sc + " 分 · " + title + "。" +
+      S.bites + " 口里 " + S.hot + " 口是热着吃的，拍了 " + S.photo.n + " 张照片（最热 " +
+      (S.photo.best ? Math.round(S.photo.best*10)/10 : "—") + "℃）。你舍得先放下手机吗？";
+  }
+};
+/* ================= role_guest_draw.js ================= */
+/* ==================================================================
+   ③ 客人 —— 画面：大理石桌面 · 铁板牛排在凉 · 手机先吃
+   ================================================================== */
+ROLES.guest.bg = function(dt){
+  var g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, "#1d1a1c"); g.addColorStop(.42, "#2a2326"); g.addColorStop(1, "#3b3236");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  /* 背景餐厅的虚焦光斑 */
+  var tt = performance.now()/1000;
+  for(var i = 0; i < 14; i++){
+    var x = (i*137) % W, y = 40 + (i*53) % 150, r = 26 + (i % 4)*14;
+    var gl = ctx.createRadialGradient(x, y, 2, x, y, r);
+    gl.addColorStop(0, "rgba(255,214,150," + (0.06 + 0.03*Math.sin(tt + i)) + ")");
+    gl.addColorStop(1, "rgba(255,214,150,0)");
+    ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(x, y, r, 0, 6.284); ctx.fill();
+  }
+  /* 大理石台面 */
+  ctx.fillStyle = "rgba(242,236,228,.94)"; ctx.fillRect(0, 208, W, H - 208);
+  ctx.strokeStyle = "rgba(150,140,132,.30)"; ctx.lineWidth = 1.4;
+  for(var k = 0; k < 16; k++){
+    ctx.beginPath();
+    var sx = (k*97) % W, sy = 226 + (k*61) % 340;
+    ctx.moveTo(sx, sy);
+    ctx.bezierCurveTo(sx + 90, sy - 24, sx + 150, sy + 34, sx + 250, sy - 6);
+    ctx.stroke();
+  }
+  ctx.fillStyle = "rgba(0,0,0,.16)"; ctx.fillRect(0, 208, W, 6);
+};
+ROLES.guest.draw = function(S, dt){
+  var tt = performance.now()/1000, w = S.wine, p = S.photo;
+  var hot = S.temp >= 55, warm = S.temp >= 45 && S.temp < 55;
+  var mc = meatColor(S.temp);
+  /* ---- 餐盘 ---- */
+  ctx.beginPath(); ctx.ellipse(472, 402, 208, 132, 0, 0, 6.284);
+  ctx.fillStyle = "rgba(0,0,0,.16)"; ctx.fill();
+  ctx.beginPath(); ctx.ellipse(472, 396, 204, 128, 0, 0, 6.284);
+  ctx.fillStyle = "#fbf8f4"; ctx.fill();
+  ctx.beginPath(); ctx.ellipse(472, 396, 176, 106, 0, 0, 6.284);
+  ctx.fillStyle = "#f2ece4"; ctx.fill();
+  ctx.beginPath(); ctx.ellipse(472, 396, 154, 92, 0, 0, 6.284);
+  ctx.strokeStyle = "rgba(180,170,160,.55)"; ctx.lineWidth = 1.6; ctx.stroke();
+  /* 汁水 */
+  ctx.beginPath(); ctx.ellipse(500, 420, 96, 46, 0.2, 0, 6.284);
+  ctx.fillStyle = "rgba(120,40,36,.16)"; ctx.fill();
+  /* ---- 牛排（剩下几瓣就画几瓣） ---- */
+  var wedges = Math.max(0, S.wedge), r0 = 104, r1 = 62, a0 = -2.5;
+  for(var i = 0; i < wedges; i++){
+    var s = a0 + i*(6.284/8), e = s + 6.284/8 - 0.10;
+    ctx.beginPath();
+    ctx.arc(468, 392, r0, s, e); ctx.arc(468, 392, r1, e, s, true);
+    ctx.closePath();
+    ctx.fillStyle = i % 2 ? mc : shade(mc, 1.12);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(60,30,20,.35)"; ctx.lineWidth = 1.4; ctx.stroke();
+  }
+  /* 焦壳外圈 */
+  if(wedges > 0){
+    ctx.beginPath(); ctx.arc(468, 392, r0 + 4, a0, a0 + wedges*(6.284/8) - 0.06);
+    ctx.strokeStyle = "rgba(78,42,22,.85)"; ctx.lineWidth = 9; ctx.stroke();
+  }
+  /* 热气 */
+  if(S.temp >= 55) steam(468, 300, 5, tt, Math.min(0.5, (S.temp - 52)/26));
+  /* ---- 温度读数 ---- */
+  var tcol = hot ? "#8e2b2c" : (warm ? "#a86a2c" : "#8a7a70");
+  pt((Math.round(S.temp*10)/10) + "℃", 468, 560, 40, tcol, "center", 900);
+  pt(hot ? "还能吃出汁水" : (warm ? "温吞 —— 差点意思" : "凉了，白吃"), 468, 584, 15, tcol, "center", 700);
+  /* ---- 刀叉 ---- */
+  ctx.save(); ctx.translate(190, 330); ctx.rotate(-0.22);
+  box(-8, -70, 16, 140, 8, "#d8dade", "rgba(120,126,132,.8)", 2);
+  ctx.beginPath(); ctx.moveTo(-14, -70); ctx.lineTo(14, -70); ctx.lineTo(0, -104); ctx.closePath();
+  ctx.fillStyle = "#e4e6ea"; ctx.fill(); ctx.restore();
+  ctx.save(); ctx.translate(756, 336); ctx.rotate(0.22);
+  box(-7, -66, 14, 132, 7, "#d8dade", "rgba(120,126,132,.8)", 2);
+  for(var f = 0; f < 3; f++){
+    ctx.beginPath(); ctx.moveTo(-12 + f*12, -66); ctx.lineTo(-6 + f*12, -66); ctx.lineTo(-6 + f*12, -100); ctx.lineTo(-12 + f*12, -100);
+    ctx.closePath(); ctx.fillStyle = "#e4e6ea"; ctx.fill();
+  }
+  ctx.restore();
+  /* ---- 酒杯 ---- */
+  var wx = 828, wy = 300, pip = S.pair;
+  ctx.beginPath(); ctx.ellipse(wx, 360, 30, 9, 0, 0, 6.284); ctx.fillStyle = "rgba(0,0,0,.18)"; ctx.fill();
+  box(wx - 3, 292, 6, 62, 3, "rgba(230,236,240,.55)");
+  box(wx - 24, 348, 48, 8, 4, "rgba(230,236,240,.5)");
+  ctx.beginPath();
+  ctx.moveTo(wx - 30, 292); ctx.lineTo(wx + 30, 292);
+  ctx.quadraticCurveTo(wx + 26, 250, wx, 244); ctx.quadraticCurveTo(wx - 26, 250, wx - 30, 292);
+  ctx.closePath();
+  ctx.fillStyle = pip.w === "赤霞珠" ? "rgba(110,20,32,.78)" : (pip.w === "西拉" ? "rgba(70,20,40,.78)" : "rgba(140,40,60,.72)");
+  ctx.fill();
+  ctx.strokeStyle = "rgba(240,246,250,.6)"; ctx.lineWidth = 2; ctx.stroke();
+  pt(pip.w, wx, 222, 16, "#f0e6dc", "center", 800);
+  pt(pip.cut + (pip.ok ? " ✓ 配得上" : " ✗ 配不上"), wx, 202, 13, pip.ok ? "#a8d08a" : "#e08a8a", "center", 700);
+  if(w.reset > 0){
+    ctx.beginPath(); ctx.arc(wx, 292, 42, -1.57, -1.57 + (w.reset/3)*6.284);
+    ctx.strokeStyle = "rgba(168,208,138,.9)"; ctx.lineWidth = 4; ctx.stroke();
+  }
+  if(w.debuff > 0){
+    box(wx - 60, 366, 120, 26, 8, "rgba(224,138,138,.85)");
+    pt("涩 · 满足度减半 " + w.debuff.toFixed(1) + "s", wx, 384, 12.5, "#3a1a1a", "center", 800);
+  }
+  if(w.swap > 0){
+    pt("换酒中 " + w.swap.toFixed(1) + "s", wx, 172, 15, "#ffd45e", "center", 800);
+  }
+  /* ---- 手机 ---- */
+  var px = 250, py = 470;
+  ctx.save(); ctx.translate(px, py); ctx.rotate(-0.10);
+  box(-52, -86, 104, 172, 14, "#15151a", "rgba(255,255,255,.25)", 3);
+  box(-44, -76, 88, 152, 8, "#2a2a34");
+  pt("📷", 0, 10, 34, "#e8e8f0", "center", 700);
+  if(p.ph > 0){
+    ctx.beginPath(); ctx.arc(0, 0, 62, -1.57, -1.57 + Math.min(1, p.ph/3)*6.284);
+    ctx.strokeStyle = "#ffd45e"; ctx.lineWidth = 6; ctx.stroke();
+    pt((3 - Math.min(3, p.ph)).toFixed(1), 0, 72, 20, "#ffd45e", "center", 900);
+  }
+  pt("⏺ 长按 3 秒", 0, 100, 13, "rgba(255,255,255,.65)", "center", 700);
+  ctx.restore();
+  if(p.flash > 0){
+    ctx.fillStyle = "rgba(255,255,255," + Math.min(.5, p.flash) + ")";
+    ctx.fillRect(0, 0, W, H);
+  }
+  /* ---- 拍到的照片贴在左边 ---- */
+  var n = Math.min(4, p.n);
+  for(var q = 0; q < n; q++){
+    var qx = 40, qy = 210 + q*74;
+    ctx.save(); ctx.translate(qx, qy); ctx.rotate(-0.06 + q*0.04);
+    box(0, 0, 96, 64, 4, "#fbf8f4", "rgba(120,110,100,.5)", 2);
+    box(6, 6, 84, 38, 2, q === n - 1 ? "#b9634a" : "#8a5a48");
+    pt("咔嚓 " + (Math.round((q === n-1 ? p.last : p.best)*10)/10) + "℃", 48, 60, 11, "#6b5b4e", "center", 700);
+    ctx.restore();
+  }
+  if(p.n > 0) pt("已拍 " + p.n + " 张", 88, 200, 13, "rgba(255,255,255,.6)", "center", 700);
+};
+/* 颜色微调：把 #rrggbb 变亮/暗 */
+function shade(hex, k){
+  var r = parseInt(hex.substr(1, 2), 16), g = parseInt(hex.substr(3, 2), 16), b = parseInt(hex.substr(5, 2), 16);
+  r = Math.min(255, Math.round(r*k)); g = Math.min(255, Math.round(g*k)); b = Math.min(255, Math.round(b*k));
+  return "rgb(" + r + "," + g + "," + b + ")";
+}
+/* ================= boot.js ================= */
+/* ==================================================================
+   boot.js —— 开场动画（八档熟度 4 秒）+ 面板接线 + 对外句柄 + 启动
+   ================================================================== */
+
+/* ------------------------- 开场：八档熟度 ------------------------- */
+var IC = document.getElementById("icv"), ictx = IC ? IC.getContext("2d") : null;
+var introOn = false, introRAF = 0, INTRO_STICKY = false;
+function introHide(){
+  introOn = false;
+  if(introRAF){ cancelAnimationFrame(introRAF); introRAF = 0; }
+  if(IC) IC.classList.add("hide");
+  syncPad();
+}
+function introPlay(sticky){
+  if(!IC || !ictx) return;
+  INTRO_STICKY = !!sticky;
+  introOn = true; IC.classList.remove("hide"); syncPad();
+  var w = IC.clientWidth || 940, h = IC.clientHeight || 588;
+  IC.width = w; IC.height = h;
+  var t0 = performance.now();
+  function step(now){
+    if(!introOn) return;
+    var t = (now - t0)/1000;
+    drawIntro(ictx, w, h, t);
+    if(t > 4.4){ if(!INTRO_STICKY) introHide(); return; }   /* 粘住模式：停在最后一帧，等用户点 */
+    introRAF = requestAnimationFrame(step);
+  }
+  introRAF = requestAnimationFrame(step);
+}
+function fade(t, a, b){ return Math.max(0, Math.min(1, (t - a)/(b - a))); }
+function drawIntro(x, w, h, t){
+  x.clearRect(0, 0, w, h);
+  x.fillStyle = "#171310"; x.fillRect(0, 0, w, h);
+  var g = x.createRadialGradient(w/2, h*0.5, 20, w/2, h*0.5, Math.max(w, h)*0.75);
+  g.addColorStop(0, "rgba(255,170,80,.10)"); g.addColorStop(1, "rgba(255,170,80,0)");
+  x.fillStyle = g; x.fillRect(0, 0, w, h);
+  var s = Math.min(w/940, h/588);
+  x.save(); x.translate((w - 940*s)/2, (h - 588*s)/2); x.scale(s, s);
+  var F = "'PingFang SC','Microsoft YaHei',sans-serif";
+  var a1 = fade(t, 0.15, 0.85);
+  x.globalAlpha = a1; x.textAlign = "center";
+  x.fillStyle = "#f6efe6"; x.font = "900 64px " + F;
+  x.fillText("我要吃牛排", 470, 132);
+  x.fillStyle = "#c8a06c"; x.font = "700 21px " + F;
+  x.fillText("一块肉，三个位置 · 一局 60 秒", 470, 172);
+  x.globalAlpha = 1;
+  /* 八档熟度（指南 §02 的六档 + 生肉 20℃ + 碳化 74℃+） */
+  var row = [{ zh: "生肉", en: "Raw", t: 20 }, { zh: "近生", en: "Blue Rare", t: 46 }, { zh: "一分熟", en: "Rare", t: 52 },
+    { zh: "三分熟", en: "Medium Rare", t: 57, star: 1 }, { zh: "五分熟", en: "Medium", t: 63, star: 1 },
+    { zh: "七分熟", en: "Medium Well", t: 66 }, { zh: "全熟", en: "Well Done", t: 71 }, { zh: "焦炭", en: "Charred", t: 78 }];
+  var n = row.length, cw = 96, gap = 14, x0 = (940 - (n*cw + (n-1)*gap))/2, y0 = 244, ch = 96;
+  var sweep = 1.0 + (t - 1.0) * (n/1.9);      /* 1.9 秒扫过八档 */
+  for(var i = 0; i < n; i++){
+    var ap = fade(t, 0.9 + i*0.09, 1.35 + i*0.09);
+    if(ap <= 0) continue;
+    var cx = x0 + i*(cw + gap), on = (i <= sweep - 1);
+    x.globalAlpha = ap;
+    x.beginPath();
+    if(x.roundRect) x.roundRect(cx, y0, cw, ch, 14); else x.rect(cx, y0, cw, ch);
+    x.fillStyle = meatColor(row[i].t); x.fill();
+    x.lineWidth = on ? 3.5 : 1.5;
+    x.strokeStyle = on ? "#ffd45e" : "rgba(255,255,255,.16)";
+    x.stroke();
+    if(row[i].star){
+      x.fillStyle = "rgba(20,12,8,.75)"; x.font = "900 15px " + F;
+      x.fillText("★", cx + cw - 14, y0 + 22);
+    }
+    x.textAlign = "center";
+    x.fillStyle = "#f0e6dc"; x.font = "700 15px " + F;
+    x.fillText(row[i].zh, cx + cw/2, y0 + ch + 26);
+    x.fillStyle = "#b7a89b"; x.font = "600 11.5px " + F;
+    x.fillText(row[i].en, cx + cw/2, y0 + ch + 45);
+    x.fillStyle = "#ffd45e"; x.font = "900 19px " + F;
+    x.fillText(row[i].t + "℃", cx + cw/2, y0 + ch + 72);
+    x.globalAlpha = 1;
+  }
+  /* 三个位置 */
+  var a3 = fade(t, 3.0, 3.7);
+  if(a3 > 0){
+    x.globalAlpha = a3;
+    x.textAlign = "center";
+    x.fillStyle = "#f6efe6"; x.font = "900 30px " + F;
+    x.fillText("① 厨师 　→　 ② 服务员 　→　 ③ 客人", 470, 500);
+    x.fillStyle = "#c8a06c"; x.font = "700 19px " + F;
+    x.fillText("生肉 20℃ →【厨师】→ 出餐 →【服务员】→ 上桌 →【客人】→ 结束", 470, 536);
+    x.globalAlpha = 1;
+  }
+  x.textAlign = "center";
+  x.fillStyle = "rgba(240,230,220,.42)"; x.font = "600 15px " + F;
+  x.fillText("点一下跳过", 470, 570);
+  x.restore();
+}
+if(IC){
+  IC.addEventListener("pointerdown", introHide);
+  document.addEventListener("keydown", function(e){
+    if(introOn && (e.key === "Escape" || e.key === " " || e.key === "Enter")) introHide();
+  });
+}
+
+/* ------------------------- 面板接线 ------------------------- */
+function fillStart(){
+  var box = document.getElementById("startRules");
+  if(!box) return;
+  var lines = [];
+  box.innerHTML = "";
+  ["chef", "foh", "guest"].forEach(function(id){
+    var rc = ROLES[id];
+    var d = document.createElement("div");
+    d.className = "rline";
+    d.style.borderLeftColor = rc.ac;
+    d.innerHTML = "<b>" + rc.name + "</b>　" + (rc.tip || "");
+    box.appendChild(d);
+    lines.push(rc);
+  });
+  var hint = document.createElement("div");
+  hint.className = "rhint";
+  hint.textContent = "键盘：← → 调整 · 空格 = ⏺ · M 静音 · F 全屏　｜　手机上就是底部三个按钮";
+  box.appendChild(hint);
+}
+function bestLine(){
+  var parts = ["chef", "foh", "guest"].map(function(id){
+    var b = 0; try{ b = parseInt(localStorage.getItem("stk_best_" + id) || "0", 10) || 0; }catch(e){ b = 0; }
+    return ROLES[id].name2 + " " + (b ? b : "—");
+  });
+  var e = document.getElementById("bestLine0");
+  if(e) e.textContent = parts.join("　·　");
+}
+function lastRole(){
+  var r = "chef";
+  try{ r = localStorage.getItem("stk_last_role") || "chef"; }catch(e){ r = "chef"; }
+  return ROLES[r] ? r : "chef";
+}
+(function wire(){
+  var cards = document.querySelectorAll("#cards .rcard");
+  for(var i = 0; i < cards.length; i++){
+    (function(el){
+      var id = el.getAttribute("data-role");
+      el.addEventListener("click", function(){
+        if(introOn) introHide();
+        setRole(id); musicStart(); sfx("click");
+      });
+    })(cards[i]);
+  }
+  var sb = document.getElementById("startBtn");
+  if(sb) sb.addEventListener("click", function(){
+    if(introOn) introHide();
+    setRole(lastRole()); musicStart(); sfx("click");
+  });
+  var ib = document.getElementById("introBtn");
+  if(ib) ib.addEventListener("click", function(){ introPlay(); });
+  var ab = document.getElementById("againBtn");
+  if(ab) ab.addEventListener("click", function(){ reset(); musicStart(); });
+  var sv = document.getElementById("saveBtn");
+  if(sv) sv.addEventListener("click", function(){ if(S && S.ended) saveCard(); });
+  var cp = document.getElementById("copyBtn");
+  if(cp) cp.addEventListener("click", function(){
+    var ta = document.getElementById("share");
+    try{
+      ta.select(); document.execCommand("copy");
+      cp.textContent = "✅ 复制好了";
+      setTimeout(function(){ cp.textContent = "📋 复制战绩"; }, 1600);
+    }catch(e){ ta.select(); }
+  });
+  var sh = document.getElementById("share");
+  if(sh) sh.addEventListener("click", function(){ this.select(); });
+})();
+
+/* ------------------------- 对外句柄（自动化复核用） ------------------------- */
+window.__game = {
+  roles: ["chef", "foh", "guest"],
+  get role(){ return R ? R.id : null; },
+  get S(){ return S; },
+  get running(){ return running; },
+  get scale(){ return SCALE; },
+  hold: function(a, v){ HOLD[a] = !!v; },
+  box: function(){
+    var r = document.getElementById("cv").getBoundingClientRect();
+    return { x: r.x, y: r.y, w: r.width, h: r.height };
+  },
+  pad: function(a){
+    try{
+      var msg = new MessageEvent("pointerdown");
+      var el = a === "main" ? document.getElementById("padMain") : document.querySelector('#pad [data-act="' + a + '"]');
+      if(!el) return null;
+      el.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+      return true;
+    }catch(e){ return null; }
+  },
+  introHide: introHide,
+  end: endGame,
+  setRole: setRole,
+  reset: reset,
+  saveCard: saveCard,
+  /* ---- 复核用：确定性推进（不受 rAF 节流影响） ---- */
+  step: function(sec, dt){
+    dt = dt || (1/60);
+    var n = Math.max(1, Math.min(40000, Math.round(sec/dt)));
+    running = false;                       /* 先停 rAF 驱动，避免重复推进 */
+    for(var i = 0; i < n; i++){ if(!S || S.ended) break; update(dt*SPEED); }
+    if(S){ render(dt); hudRender(); }
+    return S ? { t: +S.t.toFixed(2), ended: !!S.ended } : null;
+  },
+  resume: function(){ if(S && !S.ended){ running = true; last = performance.now(); } },
+  act: function(a){ if(S && R && R.act) R.act(S, a); },
+  intro: function(on){ on ? introPlay(true) : introHide(); },
+  roles_meta: function(){
+    return ["chef", "foh", "guest"].map(function(id){
+      var r = ROLES[id];
+      return { id: id, name: r.name, key: r.key, padMain: r.padMain, hud: r.hud };
+    });
+  }
+};
+
+/* ------------------------- 启动 ------------------------- */
+fillStart(); bestLine();
+syncPad();
+if(BOT){
+  /* 机器人模式：不跑开场，直接进指定角色 */
+  introHide();
+  var rq = (Q.get("role") || "chef").toLowerCase();
+  setRole(ROLES[rq] ? rq : "chef");
+}else{
+  var rq0 = (Q.get("role") || "").toLowerCase();
+  var auto = (rq0 && ROLES[rq0] && Q.get("auto") === "1") ? rq0 : null;
+  if(rq0 && ROLES[rq0]) setRole(rq0, !auto);        /* 预选角色（auto=1 则直接开局） */
+  var seen = false;
+  try{ seen = localStorage.getItem("stk_intro_seen") === "1"; }catch(e){ seen = false; }
+  var fi = Q.get("intro");                     /* intro=1 强制演（且粘住等点击）/ intro=0 强制跳 / 缺省看是否看过 */
+  if(auto || fi === "0" || (seen && fi !== "1")){
+    introHide();
+  }else{
+    introPlay(fi === "1");
+    if(fi !== "1"){ try{ localStorage.setItem("stk_intro_seen", "1"); }catch(e){} }
+  }
+}
+</script>
+</body>
+</html>
